@@ -23,10 +23,11 @@ Guide seat: `claude-sonnet-5-5`, effort `high` (user-attested), opened 2026-11-1
 - Public flip is a consent-gated Step-3 action (required at submission; OSI license, Apache-2.0 from the starter).
 
 ## Tollgate
-- Report: not yet created — Step 0a Stage 0 creates `docs/tollgate/2026-11-17-tollgate.md`.
-- Guide-side preflight 2026-11-17: git PASS (2.54, identity set) · gh PASS (Dotman-Bei, repo scope) · kit PASS (not behind origin) · node PASS (v22) · python 3.12 PASS · free disk 65 GB PASS.
-- Fe toolchain: `fe` NOT installed on this machine. Release v26.6.0 ships `fe_windows_amd64.exe`; the documented installer is bash-based (feup). Cargo is present, but no MSVC build tools were found, so build-from-source is the worse path. → Stack row for the architect; user installs Fe before Step 2.
-- Verdicts: 0a pending Stage 0.
+- Report: `docs/tollgate/2026-11-17-tollgate.md` (created by 0a Stage 0, extended in 0a session 2; one report only).
+- Guide-side preflight 2026-11-17: git PASS · gh PASS (Dotman-Bei) · kit PASS (1 ahead / 0 behind origin) · node v22 · python 3.12 · disk 65 GB.
+- Row 5 (Chrome) passed in 0a session 2 only; session-scoped, Step 3 re-probes at its boot.
+- **Row 19 (`fe` CLI) FAIL, blocks Step 2.** feup.sh rejects Git Bash. Working path: download `fe_windows_amd64.exe` from the v26.6.0 release, rename to `fe.exe`, put it in a folder on the user PATH, then `fe --version` must show 26.6.0 in PowerShell AND Git Bash. Install before Step 1 so the architect can probe syntax.
+- Verdicts: 0a DONE · 0 CLEAR · 1 CLEAR (row 19 degraded) · 2 BLOCKED (row 19) · 2.5 N-A · 3 CLEAR (provisional).
 
 ## Goal
 Win — top-3 finish (1st $2,500) with a "Rethink a protocol" entry (reimagine an auction, exchange or governance mechanism in Fe).
@@ -44,16 +45,24 @@ Win — top-3 finish (1st $2,500) with a "Rethink a protocol" entry (reimagine a
 | Step | Status | Artifact | Verification | Seat settings |
 |---|---|---|---|---|
 | Registration | pending (user) | project ID + submission link by email | — | — |
-| 0a | pending | `docs/resources/<date>-fe-builders-challenge/` | — | |
+| 0a | **done** (main 110b725) | `docs/resources/2026-11-17-fe-builders-challenge/` (event, tracks, prior-art, seeds, INDEX, 4 sponsors/fe-* files) | Guide verified 2026-11-17: pushed; weights 30/25/20/15/10 match the live page; deadlines in UTC+WAT; gaps labelled (Zulip login-gated, nothing compiled, private entries invisible) | claude-opus-5-5, effort high (per the session's own report) |
 | 0 | pending | `docs/idea-forge/*-brief.md` | — | |
 | 1 | pending | spec + plans + manifest | — | |
 | 2 | pending | commits | — | |
 | 2.5 | deferred | | | |
 | 3 | pending | gate ledger + submission | — | |
 
+## Pack findings that shape the campaign (from 0a, guide-verified as recorded)
+- 15 public competing entries; NONE does an auction, governance mechanism or exchange/order book. Nearest: LMSR market maker, 2 escrow/crowdfunding, 3 AI-agent spend-limit entries (crowded), math libs and test tools 3–4 each. Fe-team `rosetta` has basic governance + AMM (pre-26.5 syntax, no license); plain Fe auctions exist from old versions → originality must come from the mechanism.
+- `fe test` has no cheatcodes (no warp/prank/deal) and no fuzzing: multi-actor tests need proxy-actor contracts; time-dependent logic takes time as an input.
+- Native backend is Linux/macOS only: the organisers' "one codebase on-chain + off-chain simulator" idea needs WSL (no distro) or CI. Windows `fe build`/`fe test` for EVM are fine.
+- Add `.gitattributes` with `*.fe text eol=lf` (machine has core.autocrlf=true). Starter CI pins v26.5.0 → bump to v26.6.0.
+- Blog adds "clear security assumptions" to the 30% axis; blog also says gas claims need benchmarks.
+
 ## Next action
-User: register for the challenge today (before 2026-11-17 23:59 UTC), in parallel with Step 0a kickoff in a fresh tab.
+User: (1) confirm registration is done (closes 2026-11-18 00:59 WAT) · (2) paste the Step 0 (idea-forge) kickoff in a fresh tab at opus + max · (3) in parallel, install `fe` 26.6.0 (row 19).
 
 ## Open blockers
-- Registration closes in ~24h; nothing else can be submitted without it.
-- `fe` not installed locally (needed by Step 2; ideally installed before Step 1 so the architect can probe it).
+- Registration closes 2026-11-18 00:59 WAT; nothing can be submitted without it.
+- `fe` not installed (blocks Step 2; install before Step 1).
+- Calendar-fit call on the brief is the guide's, after Step 0.
