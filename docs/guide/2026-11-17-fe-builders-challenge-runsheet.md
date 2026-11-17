@@ -76,6 +76,7 @@ User: (1) **register NOW** (closes 2026-11-18 00:59 WAT) with name "AnyOrder" + 
 
 ## Open blockers
 - ~~Registration~~ done (user-attested). Remaining submission-side fact: the personal submission link (email) is needed at Step 3; user keeps it, never in the repo.
-- User authorised the architect session to install `fe` 26.6.0 for them (2026-11-17 ~23:10 WAT): scoped to the official release exe, user-scope PATH append only, tollgate row 19 updated by that session. Guide re-probes row 19 afterwards.
+- **fe 26.6.0 INSTALLED and guide-verified 2026-11-17:** file 63,244,800 B, SHA-256 374dbda7e36849cbd322b59a8a6228e5f37009ad01f85dd1c41edebbb5a97d25 matches, `fe --version` = `fe 26.6.0 (5b3f96a)`, one User-PATH entry `C:\Users\<user>\.fe\bin`; tollgate row 19 PASS (commit 406453b). Undo: delete `C:\Users\<user>\.fe` and remove that PATH entry. Findings that bind the plans: `fe fmt --check` FAILS on CRLF, so `.gitattributes *.fe text eol=lf` is REQUIRED; `fe fmt` has no workspace mode (run per member); root `fe build` puts all members' artifacts in one `out/`; raw-integer selectors emit no ABI json (dApp messages use `sol("...")` selectors).
+- (history) User authorised the architect session to install `fe` 26.6.0 for them (2026-11-17 ~23:10 WAT): scoped to the official release exe, user-scope PATH append only, tollgate row 19 updated by that session. Guide re-probes row 19 afterwards.
 - Architect Q1 answered: commit only loaded runtime assets, unmodified, under web/public/assets/ + MIT notice; skill files never copied.
 - `fe` not installed (confirmed absent 2026-11-17 22:21 WAT): degraded for Step 1, hard block for Step 2.
