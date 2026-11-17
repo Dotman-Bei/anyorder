@@ -17,9 +17,8 @@ Guide seat: `claude-sonnet-5-5`, effort `high` (user-attested), opened 2026-11-1
 - **Judges:** Austin Griffith, Ahmed Castro, Marius van der Wijden, Philogy (Plank), Rahul Kothari, jistro (EVVM), Grant Wuerker + Micah Scopes (Fe core devs; Argot).
 
 ## Project repo
-- `Dotman-Bei/fe-builders-challenge-2026` — **private**, created by the guide via the user's gh (repo-bootstrap.md), 2026-11-17.
-- Local clone: `C:\Users\<user>\Documents\VIBE CODE\Hackathons\fe-builders-challenge-2026` (sibling of the kit).
-- Event-named; idea-forge Step 4 renames it to the project slug. After a rename the local folder keeps the old name; record both here.
+- **Current: `Dotman-Bei/anyorder`** — **private**, remote `https://github.com/Dotman-Bei/anyorder.git`. Renamed by idea-forge Step 0 on 2026-11-17 from `Dotman-Bei/fe-builders-challenge-2026` (created by the guide via the user's gh, repo-bootstrap.md). Use `Dotman-Bei/anyorder` in every kickoff's REPO field.
+- Local clone (folder keeps the OLD name): `C:\Users\<user>\Documents\VIBE CODE\Hackathons\fe-builders-challenge-2026` (sibling of the kit). Origin verified = anyorder.git.
 - Public flip is a consent-gated Step-3 action (required at submission; OSI license, Apache-2.0 from the starter).
 
 ## Tollgate
@@ -46,7 +45,7 @@ Win — top-3 finish (1st $2,500) with a "Rethink a protocol" entry (reimagine a
 |---|---|---|---|---|
 | Registration | pending (user) | project ID + submission link by email | — | — |
 | 0a | **done** (main 110b725) | `docs/resources/2026-11-17-fe-builders-challenge/` (event, tracks, prior-art, seeds, INDEX, 4 sponsors/fe-* files) | Guide verified 2026-11-17: pushed; weights 30/25/20/15/10 match the live page; deadlines in UTC+WAT; gaps labelled (Zulip login-gated, nothing compiled, private entries invisible) | claude-opus-5-5, effort high (per the session's own report) |
-| 0 | pending | `docs/idea-forge/*-brief.md` | — | |
+| 0 | **done** (cb73c4f) | `docs/idea-forge/2026-11-17-anyorder-brief.md` (AnyOrder: uniform-price batch-auction exchange in Fe, 373 lines) | Guide verified 2026-11-17 22:20 WAT: pushed, repo renamed + description set, all required fields present incl. Feasibility notes (pack facts with sources), security assumptions, out-of-scope, stretch, longest pole. Calendar fit: FITS (see Strategy). | claude-opus-5-5, effort max (user-attested). The session first reported claude-fable-5-1 and switched to Opus before real work began. |
 | 1 | pending | spec + plans + manifest | — | |
 | 2 | pending | commits | — | |
 | 2.5 | deferred | | | |
@@ -59,10 +58,15 @@ Win — top-3 finish (1st $2,500) with a "Rethink a protocol" entry (reimagine a
 - Add `.gitattributes` with `*.fe text eol=lf` (machine has core.autocrlf=true). Starter CI pins v26.5.0 → bump to v26.6.0.
 - Blog adds "clear security assumptions" to the 30% axis; blog also says gas claims need benchmarks.
 
+## Calendar-fit call on AnyOrder (guide, 2026-11-17 22:20 WAT)
+- Time left: ~6.1 days to the 2026-11-24 18:00 UTC internal target (submission closes 2026-11-24 23:59 UTC). Already burned: the whole of Nov 17.
+- Scope: pure clearing core + property suite, one batch contract, test ERC20, proxy actors, test-only AMM baseline, Python reference, README. No UI, deploy, keys or video. **Fits** for an agent pool, provided Fe compiles as the pack says.
+- Real risk = unverified Fe syntax (nothing compiled yet), not scope. Mitigations to ask of the architect: (a) first plan task is a walking skeleton: starter compiles on 26.6.0, one effect-free pure fn, one proxy-actor test, one `fe fmt --check`; (b) clearing core + property tests are the highest-effort, top-tier tasks; (c) stretch items (gas table, Linux CI native build) cut first.
+- Spec risk to flag to the architect: define the "sandwich nets zero" claim PRECISELY. Attacker-free vs attacked batch price can differ if the attacker's legs shift the curves asymmetrically; a judge who reads adversarially (Philogy) will test it. State the exact condition under which the victim's fill is unchanged, and the cases where it is not, instead of an unconditional claim.
+
 ## Next action
-User: (1) confirm registration is done (closes 2026-11-18 00:59 WAT) · (2) paste the Step 0 (idea-forge) kickoff in a fresh tab at opus + max · (3) in parallel, install `fe` 26.6.0 (row 19).
+User: (1) **register NOW** (closes 2026-11-18 00:59 WAT) with name "AnyOrder" + the brief's Solution line · (2) install `fe` 26.6.0 (row 19; nothing compiled until then) · (3) paste the Step 1 (architect) kickoff in a fresh tab at opus + xhigh.
 
 ## Open blockers
-- Registration closes 2026-11-18 00:59 WAT; nothing can be submitted without it.
-- `fe` not installed (blocks Step 2; install before Step 1).
-- Calendar-fit call on the brief is the guide's, after Step 0.
+- Registration closes 2026-11-18 00:59 WAT; user has not confirmed it is done.
+- `fe` not installed (confirmed absent 2026-11-17 22:21 WAT): degraded for Step 1, hard block for Step 2.
