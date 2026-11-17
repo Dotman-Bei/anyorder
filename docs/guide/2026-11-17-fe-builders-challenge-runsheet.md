@@ -64,6 +64,13 @@ Win — top-3 finish (1st $2,500) with a "Rethink a protocol" entry (reimagine a
 - Real risk = unverified Fe syntax (nothing compiled yet), not scope. Mitigations to ask of the architect: (a) first plan task is a walking skeleton: starter compiles on 26.6.0, one effect-free pure fn, one proxy-actor test, one `fe fmt --check`; (b) clearing core + property tests are the highest-effort, top-tier tasks; (c) stretch items (gas table, Linux CI native build) cut first.
 - Spec risk to flag to the architect: define the "sandwich nets zero" claim PRECISELY. Attacker-free vs attacked batch price can differ if the attacker's legs shift the curves asymmetrically; a judge who reads adversarially (Philogy) will test it. State the exact condition under which the victim's fill is unchanged, and the cases where it is not, instead of an unconditional claim.
 
+## DECISION 2026-11-17 ~22:45 WAT: AnyOrder ships as a full dApp (user override)
+- The brief's "No web UI" out-of-scope line is overridden by the user (brief not hand-edited; the architect kickoff states the override). Landing at `/`, app at `/app`.
+- **Frontend source of truth = `design-taste-frontend`** (user instruction, newest): architect plans every UI task from it, executors read `~/.claude/skills/design-taste-frontend/SKILL.md` in full, orchestrator accepts a UI task only after `scripts/gate.mjs` + SKILL.md section 5 pass. Supersedes the FRONTEND DESIGN PASS block and the earlier ui-inspiration note. The user's text said the skill lives at `~/.claude/skills/`; it was only in `Hackathons\.claude\skills\`, so the guide copied it (39 MB, byte-identical) to `C:\Users\<user>\.claude\skills\design-taste-frontend`. Never copied into the project repo.
+- Probes: anvil/cast/forge in `~/.foundry/bin` PASS · node v22 / npm 10.9.9 / pnpm present PASS · Chrome installed PASS (the gate drives headless Chrome) · gate.mjs runs (reports "GATE: OFF" with no build, as designed).
+- Scope guard: the Fe core + money-shot tests stay the 55% of the score; dApp is a separate sub-project that depends only on the frozen ABI and is cut before the core. Chain = local Anvil (public dev accounts, no secrets) required; testnet deploy/hosting not required (would add human gates + Step 3 preflight).
+- Step 2.5 (demo video) is no longer clearly deferred: with a real app it becomes cheap and valuable. Revisit after the green build.
+
 ## Next action
 User: (1) **register NOW** (closes 2026-11-18 00:59 WAT) with name "AnyOrder" + the brief's Solution line · (2) install `fe` 26.6.0 (row 19; nothing compiled until then) · (3) paste the Step 1 (architect) kickoff in a fresh tab at opus + xhigh.
 
