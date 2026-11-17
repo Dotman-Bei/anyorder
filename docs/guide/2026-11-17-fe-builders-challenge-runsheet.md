@@ -43,7 +43,7 @@ Win — top-3 finish (1st $2,500) with a "Rethink a protocol" entry (reimagine a
 ## Step status
 | Step | Status | Artifact | Verification | Seat settings |
 |---|---|---|---|---|
-| Registration | pending (user) | project ID + submission link by email | — | — |
+| Registration | **done** (user-attested 2026-11-17 before 00:59 WAT cutoff) | project ID + private submission link by email (user keeps it; never committed) | user confirmation in guide chat | — |
 | 0a | **done** (main 110b725) | `docs/resources/2026-11-17-fe-builders-challenge/` (event, tracks, prior-art, seeds, INDEX, 4 sponsors/fe-* files) | Guide verified 2026-11-17: pushed; weights 30/25/20/15/10 match the live page; deadlines in UTC+WAT; gaps labelled (Zulip login-gated, nothing compiled, private entries invisible) | claude-opus-5-5, effort high (per the session's own report) |
 | 0 | **done** (cb73c4f) | `docs/idea-forge/2026-11-17-anyorder-brief.md` (AnyOrder: uniform-price batch-auction exchange in Fe, 373 lines) | Guide verified 2026-11-17 22:20 WAT: pushed, repo renamed + description set, all required fields present incl. Feasibility notes (pack facts with sources), security assumptions, out-of-scope, stretch, longest pole. Calendar fit: FITS (see Strategy). | claude-opus-5-5, effort max (user-attested). The session first reported claude-fable-5-1 and switched to Opus before real work began. |
 | 1 | pending | spec + plans + manifest | — | |
@@ -75,5 +75,7 @@ Win — top-3 finish (1st $2,500) with a "Rethink a protocol" entry (reimagine a
 User: (1) **register NOW** (closes 2026-11-18 00:59 WAT) with name "AnyOrder" + the brief's Solution line · (2) install `fe` 26.6.0 (row 19; nothing compiled until then) · (3) paste the Step 1 (architect) kickoff in a fresh tab at opus + xhigh.
 
 ## Open blockers
-- Registration closes 2026-11-18 00:59 WAT; user has not confirmed it is done.
+- ~~Registration~~ done (user-attested). Remaining submission-side fact: the personal submission link (email) is needed at Step 3; user keeps it, never in the repo.
+- User authorised the architect session to install `fe` 26.6.0 for them (2026-11-17 ~23:10 WAT): scoped to the official release exe, user-scope PATH append only, tollgate row 19 updated by that session. Guide re-probes row 19 afterwards.
+- Architect Q1 answered: commit only loaded runtime assets, unmodified, under web/public/assets/ + MIT notice; skill files never copied.
 - `fe` not installed (confirmed absent 2026-11-17 22:21 WAT): degraded for Step 1, hard block for Step 2.
