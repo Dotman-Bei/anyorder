@@ -1,0 +1,307 @@
+//! The sandwich contrast. `fe test --filter sandwich` runs all of it: the
+//! pool where the sandwich pays, the batch where it does not (condition C),
+//! and the one-sided case where a batch price DOES move. The constants are the
+//! README's demo table; ref/clearing_ref.py computes the same numbers.
+
+use std::evm::wei
+use ingot::actors::TraderMsg
+use ingot::harness::{
+    MILLI,
+    T,
+    balances,
+    claim,
+    clear,
+    deploy_exchange,
+    deploy_token,
+    fund_eth,
+    fund_tokens,
+    new_trader,
+    place_buy,
+    place_sell,
+    set_time,
+}
+use ingot::pool::{ConstantProductPool, PoolMsg}
+use ingot::token::TokenMsg
+
+// The pool: 400 tokens against 4.4 ETH, no fee.
+const POOL_TOKENS: u256 = 400_000_000_000_000_000_000
+const POOL_ETH: u256 = 4_400_000_000_000_000_000
+// The attacker's front-run and the victim's buy, in wei.
+const FRONT_RUN_ETH: u256 = 110_000_000_000_000_000
+const VICTIM_ETH: u256 = 165_000_000_000_000_000
+// What ref/clearing_ref.py computes for the pool.
+const ATTACKER_TOKENS: u256 = 9_756_097_560_975_609_756
+const VICTIM_TOKENS_FREE: u256 = 14_457_831_325_301_204_819
+const VICTIM_TOKENS_SANDWICHED: u256 = 13_773_314_203_730_272_596
+const BACK_RUN_ETH: u256 = 118_090_638_930_163_447
+
+fn deploy_pool(token: Address, salt: u256) -> Address uses (evm: mut Evm) {
+    let pool = evm.create2<ConstantProductPool>(value: Wei::zero(), args: (token,), salt)
+    let minted: bool = evm
+        .call(
+            addr: token,
+            gas: 200000,
+            value: Wei::zero(),
+            message: TokenMsg::Mint { to: evm.address(), amount: POOL_TOKENS },
+        )
+    assert!(minted)
+    let approved: bool = evm
+        .call(
+            addr: token,
+            gas: 200000,
+            value: Wei::zero(),
+            message: TokenMsg::Approve { spender: pool, amount: POOL_TOKENS },
+        )
+    assert!(approved)
+    evm.call(
+        addr: pool,
+        gas: 300000,
+        value: wei(POOL_ETH),
+        message: PoolMsg::Seed { token_amount: POOL_TOKENS },
+    )
+    pool
+}
+
+#[test(balance = 100_000_000_000_000_000_000)]
+fn sandwich_cpmm_attacker_profits() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let attacker = new_trader(salt: 1)
+    let victim = new_trader(salt: 2)
+
+    // Without the attacker, the victim's 0.165 ETH buys this much.
+    let calm = deploy_pool(token, salt: 10)
+    let alone: u256 = evm
+        .call(
+            addr: victim,
+            gas: 500000,
+            value: wei(VICTIM_ETH),
+            message: TraderMsg::PoolBuy { pool: calm, min_out: 0 },
+        )
+    assert!(alone == VICTIM_TOKENS_FREE)
+
+    // The sandwich: front-run, victim, back-run, in that transaction order.
+    let pool = deploy_pool(token, salt: 11)
+    let bought: u256 = evm
+        .call(
+            addr: attacker,
+            gas: 500000,
+            value: wei(FRONT_RUN_ETH),
+            message: TraderMsg::PoolBuy { pool, min_out: 0 },
+        )
+    assert!(bought == ATTACKER_TOKENS)
+    let got: u256 = evm
+        .call(
+            addr: victim,
+            gas: 500000,
+            value: wei(VICTIM_ETH),
+            message: TraderMsg::PoolBuy { pool, min_out: 0 },
+        )
+    assert!(got == VICTIM_TOKENS_SANDWICHED)
+    assert!(got < alone)
+    evm.call(
+        addr: attacker,
+        gas: 200000,
+        value: Wei::zero(),
+        message: TraderMsg::ApproveToken { token, spender: pool, amount: bought },
+    )
+    let back: Wei = evm
+        .call(
+            addr: attacker,
+            gas: 500000,
+            value: Wei::zero(),
+            message: TraderMsg::PoolSell { pool, amount: bought, min_out: Wei::zero() },
+        )
+    assert!(back == wei(BACK_RUN_ETH))
+    // The attacker ends with more ETH than it spent and no tokens: a riskless profit.
+    assert!(evm.balance(attacker) == wei(BACK_RUN_ETH))
+    assert!(BACK_RUN_ETH - FRONT_RUN_ETH == 8_090_638_930_163_447)
+}
+
+// The background book of the batch: four sellers and one low buyer.
+fn place_background(exchange: Address, makers: [Address; 5])
+uses (evm: mut Evm)
+{
+    let _ = place_sell(
+        exchange,
+        trader: makers[0],
+        limit: 10 * MILLI,
+        quantity: 10 * T,
+    )
+    let _ = place_sell(
+        exchange,
+        trader: makers[1],
+        limit: 11 * MILLI,
+        quantity: 10 * T,
+    )
+    let _ = place_sell(
+        exchange,
+        trader: makers[2],
+        limit: 12 * MILLI,
+        quantity: 10 * T,
+    )
+    let _ = place_sell(
+        exchange,
+        trader: makers[3],
+        limit: 13 * MILLI,
+        quantity: 10 * T,
+    )
+    let _ = place_buy(
+        exchange,
+        trader: makers[4],
+        limit: 9 * MILLI,
+        quantity: 5 * T,
+    )
+}
+
+fn fund_makers(token: Address, exchange: Address, makers: [Address; 5])
+uses (evm: mut Evm)
+{
+    fund_tokens(token, exchange, trader: makers[0], amount: 10 * T)
+    fund_tokens(token, exchange, trader: makers[1], amount: 10 * T)
+    fund_tokens(token, exchange, trader: makers[2], amount: 10 * T)
+    fund_tokens(token, exchange, trader: makers[3], amount: 10 * T)
+    fund_eth(exchange, trader: makers[4], amount: wei(45 * MILLI))
+}
+
+#[test(balance = 100_000_000_000_000_000_000)]
+fn sandwich_batch_attacker_nets_dust() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let makers = [
+        new_trader(salt: 1),
+        new_trader(salt: 2),
+        new_trader(salt: 3),
+        new_trader(salt: 4),
+        new_trader(salt: 5),
+    ]
+    let victim = new_trader(salt: 6)
+    let attacker = new_trader(salt: 7)
+
+    // The attacker-free batch.
+    let calm = deploy_exchange(token, max_orders: 16, salt: 20)
+    fund_makers(token, exchange: calm, makers)
+    fund_eth(exchange: calm, trader: victim, amount: wei(180 * MILLI))
+    place_background(exchange: calm, makers)
+    let v_calm = place_buy(
+        exchange: calm,
+        trader: victim,
+        limit: 12 * MILLI,
+        quantity: 15 * T,
+    )
+
+    // The same batch with the sandwich, legs in front-run, victim, back-run order.
+    let hot = deploy_exchange(token, max_orders: 16, salt: 21)
+    fund_makers(token, exchange: hot, makers)
+    fund_eth(exchange: hot, trader: victim, amount: wei(180 * MILLI))
+    fund_eth(exchange: hot, trader: attacker, amount: wei(254 * MILLI))
+    fund_tokens(
+        token,
+        exchange: hot,
+        trader: attacker,
+        amount: ATTACKER_TOKENS,
+    )
+    place_background(exchange: hot, makers)
+    let front = place_buy(
+        exchange: hot,
+        trader: attacker,
+        limit: 26 * MILLI,
+        quantity: ATTACKER_TOKENS,
+    )
+    let v_hot = place_buy(
+        exchange: hot,
+        trader: victim,
+        limit: 12 * MILLI,
+        quantity: 15 * T,
+    )
+    let back = place_sell(
+        exchange: hot,
+        trader: attacker,
+        limit: 1 * MILLI,
+        quantity: ATTACKER_TOKENS,
+    )
+
+    set_time(exchange: calm, now: 60)
+    set_time(exchange: hot, now: 60)
+    let c_calm = clear(exchange: calm, batch: 0)
+    let c_hot = clear(exchange: hot, batch: 0)
+
+    // (1) The clearing price is unchanged.
+    assert!(c_calm.traded && c_hot.traded)
+    assert!(c_calm.price == 11 * MILLI && c_hot.price == 11 * MILLI)
+    // (2) The victim's fill is identical: 15 tokens, 0.165 ETH, the same refund.
+    let p_calm = claim(exchange: calm, batch: 0, index: v_calm.index)
+    let p_hot = claim(exchange: hot, batch: 0, index: v_hot.index)
+    assert!(p_calm.base == 15 * T && p_hot.base == 15 * T)
+    assert!(p_calm.quote == p_hot.quote)
+    assert!(p_hot.quote == wei(15 * MILLI))
+    // (3) Both legs fill in full at the batch price; the attacker nets 0 tokens and -1 wei.
+    let _ = claim(exchange: hot, batch: 0, index: front.index)
+    let _ = claim(exchange: hot, batch: 0, index: back.index)
+    let end = balances(exchange: hot, owner: attacker)
+    assert!(end.base == ATTACKER_TOKENS)
+    assert!(end.quote == wei(254 * MILLI - 1))
+}
+
+#[test(balance = 100_000_000_000_000_000_000)]
+fn sandwich_one_sided_moves_price() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let makers = [
+        new_trader(salt: 1),
+        new_trader(salt: 2),
+        new_trader(salt: 3),
+        new_trader(salt: 4),
+        new_trader(salt: 5),
+    ]
+    let victim = new_trader(salt: 6)
+    let attacker = new_trader(salt: 7)
+
+    let calm = deploy_exchange(token, max_orders: 16, salt: 20)
+    fund_makers(token, exchange: calm, makers)
+    fund_eth(exchange: calm, trader: victim, amount: wei(180 * MILLI))
+    place_background(exchange: calm, makers)
+    let v_calm = place_buy(
+        exchange: calm,
+        trader: victim,
+        limit: 12 * MILLI,
+        quantity: 15 * T,
+    )
+
+    // Where the guarantee stops: a one-sided buy, no matching sell.
+    let hot = deploy_exchange(token, max_orders: 16, salt: 21)
+    fund_makers(token, exchange: hot, makers)
+    fund_eth(exchange: hot, trader: victim, amount: wei(180 * MILLI))
+    fund_eth(exchange: hot, trader: attacker, amount: wei(260 * MILLI))
+    place_background(exchange: hot, makers)
+    let push = place_buy(
+        exchange: hot,
+        trader: attacker,
+        limit: 26 * MILLI,
+        quantity: 10 * T,
+    )
+    let v_hot = place_buy(
+        exchange: hot,
+        trader: victim,
+        limit: 12 * MILLI,
+        quantity: 15 * T,
+    )
+
+    set_time(exchange: calm, now: 60)
+    set_time(exchange: hot, now: 60)
+    let c_calm = clear(exchange: calm, batch: 0)
+    let c_hot = clear(exchange: hot, batch: 0)
+
+    // The price moves from 0.011 to 0.012 ETH, so the victim pays 0.18 ETH, not 0.165.
+    assert!(c_calm.price == 11 * MILLI)
+    assert!(c_hot.price == 12 * MILLI)
+    let p_calm = claim(exchange: calm, batch: 0, index: v_calm.index)
+    let p_hot = claim(exchange: hot, batch: 0, index: v_hot.index)
+    assert!(p_calm.base == 15 * T && p_hot.base == 15 * T)
+    assert!(p_calm.quote == wei(15 * MILLI))
+    assert!(p_hot.quote == Wei::zero())
+    // The attacker pays the same moved price for all 10 tokens and holds them:
+    // valued at the batch price its position is worth exactly what it paid.
+    let mine = claim(exchange: hot, batch: 0, index: push.index)
+    assert!(mine.base == 10 * T)
+    let end = balances(exchange: hot, owner: attacker)
+    assert!(end.quote == wei(140 * MILLI))
+    assert!(end.base == 10 * T)
+}
