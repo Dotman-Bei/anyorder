@@ -1,0 +1,150 @@
+//! THROWAWAY GAS SPIKE. Not part of AnyOrder and not a workspace member.
+//! `GasSpike` stores orders in AnyOrder's planned storage shape, then clears a
+//! batch the way AnyOrder will: load every order, sort, sweep the candidate
+//! prices, write each order's fill. scripts/gas-spike.sh measures `clear()` on
+//! Anvil with Osaka's per-transaction gas cap enforced.
+
+use core::ops::{Eq, Ord}
+use core::ptr::MemVec
+use std::abi::sol
+use std::evm::StorageMap
+
+struct Slot {
+    owner: Address,
+    is_buy: bool,
+    limit: u256,
+    quantity: u256,
+    owner_seq: u256,
+    locked: Wei,
+    filled: u256,
+    claimed: bool,
+}
+
+impl Copy for Slot {}
+
+struct Level { limit: u256, quantity: u256 }
+
+impl Copy for Level {}
+
+impl Eq for Level {
+    fn eq(self, _ other: Level) -> bool {
+        self.limit == other.limit
+    }
+}
+
+impl Ord for Level {
+    fn lt(self, _ other: Level) -> bool {
+        self.limit < other.limit
+    }
+    fn le(self, _ other: Level) -> bool {
+        self.limit <= other.limit
+    }
+    fn gt(self, _ other: Level) -> bool {
+        self.limit > other.limit
+    }
+    fn ge(self, _ other: Level) -> bool {
+        self.limit >= other.limit
+    }
+}
+
+pub struct Spike { count: u256, orders: StorageMap<(u256, u256), Slot> }
+
+pub msg SpikeMsg {
+    #[selector = sol("place(bool,uint256,uint256)")]
+    Place { is_buy: bool, limit: u256, quantity: u256 } -> u256,
+    #[selector = sol("clear()")]
+    Clear -> u256,
+}
+
+fn place(owner: Address, is_buy: bool, limit: u256, quantity: u256) -> u256
+uses (spike: mut Spike)
+{
+    let index = spike.count
+    spike
+        .orders
+        .set(
+            key: (0, index),
+            value: Slot {
+                owner,
+                is_buy,
+                limit,
+                quantity,
+                owner_seq: index,
+                locked: Wei::zero(),
+                filled: 0,
+                claimed: false,
+            },
+        )
+    spike.count = index + 1
+    index
+}
+
+fn clear() -> u256 uses (spike: mut Spike) {
+    var buys = MemVec<Level>::new()
+    var sells = MemVec<Level>::new()
+    var prices = MemVec<u256>::new()
+    var demand: u256 = 0
+    var i: u256 = 0
+    while i < spike.count {
+        let o = spike.orders.get(key: (0, i))
+        if o.is_buy {
+            buys.push(Level { limit: o.limit, quantity: o.quantity })
+            demand += o.quantity
+        } else {
+            sells.push(Level { limit: o.limit, quantity: o.quantity })
+        }
+        prices.push(o.limit)
+        i += 1
+    }
+    buys.sort()
+    sells.sort()
+    prices.sort()
+    var supply: u256 = 0
+    var nb: usize = 0
+    var ns: usize = 0
+    var best_volume: u256 = 0
+    var best_price: u256 = 0
+    var k: usize = 0
+    while k < prices.len() {
+        let p = prices[k]
+        while nb < buys.len() && buys[nb].limit < p {
+            demand -= buys[nb].quantity
+            nb += 1
+        }
+        while ns < sells.len() && sells[ns].limit <= p {
+            supply += sells[ns].quantity
+            ns += 1
+        }
+        let volume = if demand < supply { demand } else { supply }
+        if volume > best_volume {
+            best_volume = volume
+            best_price = p
+        }
+        k += 1
+    }
+    // Worst case for storage: every order's fill is written.
+    i = 0
+    while i < spike.count {
+        var o = spike.orders.get(key: (0, i))
+        o.filled = o.quantity / 2 + 1
+        spike.orders.set(key: (0, i), value: o)
+        i += 1
+    }
+    best_price
+}
+
+pub contract GasSpike uses (ctx: Ctx) {
+    mut spike: Spike,
+
+    recv SpikeMsg {
+        Place { is_buy, limit, quantity } -> u256
+        uses (ctx, mut spike)
+        {
+            place(owner: ctx.caller(), is_buy, limit, quantity)
+        }
+
+        Clear -> u256 uses (mut spike) {
+            clear()
+        }
+    }
+}

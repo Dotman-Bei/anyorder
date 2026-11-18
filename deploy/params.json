@@ -1,0 +1,9 @@
+{
+  "maxOrders": 100,
+  "demoBatchSize": 20,
+  "batchSeconds": 120,
+  "minQuantity": "1000000000000000",
+  "maxPrice": "1000000000000000000000",
+  "measuredBy": "scripts/gas-spike.sh",
+  "clearGas": { "10": 409402, "50": 2161907, "100": 4426468 }
+}
