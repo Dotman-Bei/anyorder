@@ -1,0 +1,276 @@
+//! Contract-level invariants: arrival-order independence across owners,
+//! solvency after every step, and the reentrancy lock.
+
+use std::evm::{ether, wei}
+use std::evm::random::{KeccakRng, Rng, shuffle}
+use anyorder_clearing::{cost_ceil, proceeds_floor}
+use ingot::actors::{Reenterer, ReentererMsg, TraderMsg}
+use ingot::harness::{
+    MILLI,
+    T,
+    balances,
+    batch_info,
+    claim,
+    clear,
+    deploy_exchange,
+    deploy_token,
+    fund_eth,
+    fund_tokens,
+    new_trader,
+    order_at,
+    place_buy,
+    place_sell,
+    set_time,
+    token_balance,
+}
+use ingot::interface::OrderRef
+
+// Rounds per test. Two seeds give 256 interleavings; one test of 256 rounds
+// runs past the test runner's per-test gas budget.
+const PERMUTATION_ROUNDS: u256 = 128
+
+// Owner `owner`'s `k`-th order. Each owner's own sequence is fixed; only the
+// interleaving across owners changes between rounds.
+fn place_scripted(exchange: Address, trader: Address, owner: u256, k: u256) -> OrderRef
+uses (evm: mut Evm)
+{
+    if owner == 0 {
+        if k == 0 {
+            return place_sell(exchange, trader, limit: 10 * MILLI, quantity: 6 * T)
+        }
+        if k == 1 {
+            return place_sell(exchange, trader, limit: 11 * MILLI, quantity: 4 * T + 7)
+        }
+        return place_buy(exchange, trader, limit: 9 * MILLI, quantity: 2 * T)
+    }
+    if owner == 1 {
+        if k == 0 {
+            return place_buy(exchange, trader, limit: 12 * MILLI, quantity: 5 * T)
+        }
+        if k == 1 {
+            return place_buy(exchange, trader, limit: 11 * MILLI, quantity: 3 * T + 3)
+        }
+        return place_sell(exchange, trader, limit: 13 * MILLI, quantity: 2 * T)
+    }
+    if owner == 2 {
+        if k == 0 {
+            return place_buy(exchange, trader, limit: 11 * MILLI, quantity: 4 * T + 1)
+        }
+        if k == 1 {
+            return place_sell(exchange, trader, limit: 11 * MILLI, quantity: 3 * T)
+        }
+        return place_buy(exchange, trader, limit: 10 * MILLI, quantity: 4 * T)
+    }
+    if k == 0 {
+        return place_sell(exchange, trader, limit: 12 * MILLI, quantity: 5 * T)
+    }
+    if k == 1 {
+        return place_buy(exchange, trader, limit: 11 * MILLI, quantity: 6 * T + 5)
+    }
+    place_sell(exchange, trader, limit: 9 * MILLI, quantity: T)
+}
+
+// Replays one book of 12 orders from 4 owners under PERMUTATION_ROUNDS seeded
+// interleavings: the order across owners is shuffled, each owner's own order
+// sequence stays fixed. Every round must give the same price and the same
+// per-owner balances after all claims.
+fn interleavings_agree(seed: u256) uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let traders = [
+        new_trader(salt: 1),
+        new_trader(salt: 2),
+        new_trader(salt: 3),
+        new_trader(salt: 4),
+    ]
+    var rng = KeccakRng::seeded(seed)
+    var first_price: u256 = 0
+    var first_base = [0, 0, 0, 0]
+    var first_quote = [0, 0, 0, 0]
+    var round: u256 = 0
+    while round < PERMUTATION_ROUNDS {
+        let exchange = deploy_exchange(token, max_orders: 16, salt: 100 + round)
+        var t: usize = 0
+        while t < 4 {
+            fund_tokens(token, exchange, trader: traders[t], amount: 20 * T)
+            fund_eth(exchange, trader: traders[t], amount: wei(200 * MILLI))
+            t += 1
+        }
+        var slots: [u256; 12] = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
+        with (Rng = rng) {
+            shuffle(mut slots)
+        }
+        var next = [0, 0, 0, 0]
+        var i: usize = 0
+        while i < 12 {
+            let owner = slots[i]
+            let at: usize = owner.downcast_unchecked()
+            let _ = place_scripted(exchange, trader: traders[at], owner, k: next[at])
+            next[at] = next[at] + 1
+            i += 1
+        }
+        set_time(exchange, now: 60)
+        let c = clear(exchange, batch: 0)
+        assert!(c.traded)
+        var index: u256 = 0
+        while index < 12 {
+            let _ = claim(exchange, batch: 0, index)
+            index += 1
+        }
+        if round == 0 {
+            first_price = c.price
+        }
+        assert!(c.price == first_price)
+        t = 0
+        while t < 4 {
+            let b = balances(exchange, owner: traders[t])
+            if round == 0 {
+                first_base[t] = b.base
+                first_quote[t] = b.quote.as_wei()
+            }
+            assert!(
+                b.base == first_base[t] && b.quote.as_wei() == first_quote[t],
+            )
+            t += 1
+        }
+        round += 1
+    }
+}
+
+#[test(balance = 1_000_000_000_000_000_000_000)]
+fn permutation_contract_interleavings_seed_7() uses (evm: mut Evm) {
+    interleavings_agree(seed: 7)
+}
+
+#[test(balance = 1_000_000_000_000_000_000_000)]
+fn permutation_contract_interleavings_seed_8() uses (evm: mut Evm) {
+    interleavings_agree(seed: 8)
+}
+
+// What the exchange owes, read through its views: free balances plus every
+// unclaimed order's lock or payout. Its holdings must always cover it.
+fn assert_solvent(token: Address, exchange: Address, traders: [Address; 4], batches: u256)
+uses (evm: mut Evm)
+{
+    var owed_base: u256 = 0
+    var owed_quote: u256 = 0
+    var t: usize = 0
+    while t < 4 {
+        let b = balances(exchange, owner: traders[t])
+        owed_base += b.base
+        owed_quote += b.quote.as_wei()
+        t += 1
+    }
+    var batch: u256 = 0
+    while batch < batches {
+        let info = batch_info(exchange, batch)
+        var i: u256 = 0
+        while i < info.order_count {
+            let o = order_at(exchange, batch, index: i)
+            if !o.claimed {
+                if info.status == 2 {
+                    if o.is_buy {
+                        owed_base += o.filled
+                        owed_quote += (o.locked - cost_ceil(quantity: o.filled, price: info.price))
+                            .as_wei()
+                    } else {
+                        owed_base += o.quantity - o.filled
+                        owed_quote += proceeds_floor(quantity: o.filled, price: info.price).as_wei()
+                    }
+                } else if o.is_buy {
+                    owed_quote += o.locked.as_wei()
+                } else {
+                    owed_base += o.quantity
+                }
+            }
+            i += 1
+        }
+        batch += 1
+    }
+    assert!(token_balance(token, account: exchange) >= owed_base)
+    assert!(evm.balance(exchange).as_wei() >= owed_quote)
+}
+
+#[test(balance = 1_000_000_000_000_000_000_000)]
+fn solvency_holds_after_every_step_of_a_seeded_run() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 32, salt: 1)
+    let traders = [
+        new_trader(salt: 2),
+        new_trader(salt: 3),
+        new_trader(salt: 4),
+        new_trader(salt: 5),
+    ]
+    var t: usize = 0
+    while t < 4 {
+        fund_tokens(token, exchange, trader: traders[t], amount: 200 * T)
+        fund_eth(exchange, trader: traders[t], amount: ether(3))
+        t += 1
+    }
+    var rng = KeccakRng::seeded(11)
+    var batch: u256 = 0
+    while batch < 3 {
+        var k: u256 = 0
+        while k < 10 {
+            let who: usize = rng.uniform(4).downcast_unchecked()
+            let limit = (9 + rng.uniform(6)) * MILLI + rng.uniform(1000)
+            let quantity = (1 + rng.uniform(5)) * T + rng.uniform(1_000_003)
+            if rng.uniform(2) == 0 {
+                let _ = place_buy(exchange, trader: traders[who], limit, quantity)
+            } else {
+                let _ = place_sell(exchange, trader: traders[who], limit, quantity)
+            }
+            assert_solvent(token, exchange, traders, batches: batch + 1)
+            k += 1
+        }
+        set_time(exchange, now: 60 * (batch + 1))
+        let _ = clear(exchange, batch)
+        assert_solvent(token, exchange, traders, batches: batch + 1)
+        var i: u256 = 0
+        while i < 10 {
+            let _ = claim(exchange, batch, index: i)
+            assert_solvent(token, exchange, traders, batches: batch + 1)
+            i += 1
+        }
+        batch += 1
+    }
+    // Everyone withdraws everything: the tokens balance exactly, and only
+    // rounding dust (at most one wei per filled order) stays behind.
+    t = 0
+    while t < 4 {
+        let b = balances(exchange, owner: traders[t])
+        evm.call(
+            addr: traders[t],
+            gas: 500000,
+            value: Wei::zero(),
+            message: TraderMsg::Withdraw { exchange, base: b.base, quote: b.quote },
+        )
+        t += 1
+    }
+    assert!(token_balance(token, account: exchange) == 0)
+    assert!(evm.balance(exchange).as_wei() <= 30)
+}
+
+#[test(balance = 10_000_000_000_000_000_000)]
+fn reentrancy_lock_refuses_a_second_withdraw() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    let hostile = evm.create2<Reenterer>(value: Wei::zero(), args: (), salt: 2)
+    evm.call(
+        addr: hostile,
+        gas: 300000,
+        value: ether(1),
+        message: ReentererMsg::Arm { exchange, quote: ether(1) },
+    )
+    // The payout re-enters `withdraw`; the lock refuses it, so the whole
+    // withdrawal reverts and the balance stays put.
+    let r = evm
+        .try_call(
+            addr: hostile,
+            gas: 1000000,
+            value: Wei::zero(),
+            message: ReentererMsg::Pull { exchange, quote: ether(1) },
+        )
+    assert!(!r.success())
+    assert!(balances(exchange, owner: hostile).quote == ether(1))
+    assert!(evm.balance(exchange) == ether(1))
+}
