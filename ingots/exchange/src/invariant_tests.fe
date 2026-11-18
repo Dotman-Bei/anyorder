@@ -255,14 +255,20 @@ fn reentrancy_lock_refuses_a_second_withdraw() uses (evm: mut Evm) {
     let token = deploy_token(salt: 0)
     let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
     let hostile = evm.create2<Reenterer>(value: Wei::zero(), args: (), salt: 2)
+    // The hostile payee deposits 2 ether and will re-enter for 1 of them, so
+    // the second withdrawal is one its balance covers: only the lock can
+    // refuse it.
     evm.call(
         addr: hostile,
         gas: 300000,
-        value: ether(1),
+        value: ether(2),
         message: ReentererMsg::Arm { exchange, quote: ether(1) },
     )
-    // The payout re-enters `withdraw`; the lock refuses it, so the whole
-    // withdrawal reverts and the balance stays put.
+    // Withdrawing 1 ether pays the hostile, whose fallback re-enters
+    // `withdraw` for the other 1 ether. The lock refuses it, so the payout
+    // fails and the whole withdrawal reverts. With the `Reentrant` check
+    // deleted the re-entry succeeds and both ether leave; the mutation check
+    // scripts/mutant-reentrancy.sh proves this test then fails.
     let r = evm
         .try_call(
             addr: hostile,
@@ -271,6 +277,7 @@ fn reentrancy_lock_refuses_a_second_withdraw() uses (evm: mut Evm) {
             message: ReentererMsg::Pull { exchange, quote: ether(1) },
         )
     assert!(!r.success())
-    assert!(balances(exchange, owner: hostile).quote == ether(1))
-    assert!(evm.balance(exchange) == ether(1))
+    assert!(balances(exchange, owner: hostile).quote == ether(2))
+    assert!(evm.balance(exchange) == ether(2))
+    assert!(evm.balance(hostile) == Wei::zero())
 }

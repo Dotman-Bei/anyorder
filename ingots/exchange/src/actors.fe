@@ -139,8 +139,10 @@ pub msg ReentererMsg {
     Pull { exchange: Address, quote: Wei },
 }
 
-/// TEST ONLY. A hostile payee: when the exchange pays it ETH, its fallback
-/// calls `withdraw` again. The transient lock must refuse the second entry.
+/// TEST ONLY. A hostile payee: the first time the exchange pays it ETH, its
+/// fallback calls `withdraw` again for `amount`, a sum it really holds, so
+/// only the transient lock can refuse the second entry. It re-enters once:
+/// the payout of a re-entry that got through is accepted without calling back.
 pub contract Reenterer uses (ctx: Ctx, call: mut Call) {
     mut target: Address,
     mut amount: Wei,
@@ -170,13 +172,17 @@ pub contract Reenterer uses (ctx: Ctx, call: mut Call) {
 
     recv {
         #[payable]
-        _ uses (mut call, target, amount) {
-            call.call(
-                addr: target,
-                gas: 40000,
-                value: Wei::zero(),
-                message: AnyOrderMsg::Withdraw { base: 0, quote: amount },
-            )
+        _ uses (mut call, target, mut amount) {
+            if amount > Wei::zero() {
+                let quote = amount
+                amount = Wei::zero()
+                call.call(
+                    addr: target,
+                    gas: 40000,
+                    value: Wei::zero(),
+                    message: AnyOrderMsg::Withdraw { base: 0, quote },
+                )
+            }
         }
     }
 }
