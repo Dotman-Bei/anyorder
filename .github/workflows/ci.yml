@@ -26,3 +26,9 @@ jobs:
       - run: fe fmt --check ingots/exchange
       - run: fe test
       - run: fe build
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # The exact-rational reference: vectors are current, and the rule matches the oracle.
+      - run: python ref/clearing_ref.py --check
+      - run: python ref/clearing_ref.py --selftest
