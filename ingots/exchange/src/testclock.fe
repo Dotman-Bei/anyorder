@@ -1,0 +1,153 @@
+//! TEST ONLY. `AnyOrderTestClock` is `AnyOrder` with the clock read from a
+//! stored test time that `setNow` moves forward, because `fe test` cannot
+//! warp the block timestamp. Every arm calls the same free functions as
+//! `AnyOrder`; only the source of `Clock` differs. It is never deployed by the
+//! local run or the dApp.
+
+use std::abi::sol
+use ingot::anyorder::MAX_ORDERS_CAP
+use ingot::interface::{
+    AnyOrderMsg,
+    BalancesView,
+    BatchView,
+    ClearingView,
+    ConfigView,
+    OrderRef,
+    OrderView,
+    Payout,
+}
+use ingot::logic::{
+    balances_view,
+    batch_view,
+    claim,
+    clear_batch,
+    config_view,
+    current_batch,
+    deposit_eth,
+    deposit_token,
+    order_view,
+    place,
+    preview,
+    withdraw,
+}
+use ingot::state::{Book, Clock, Funds, Guard, Settings}
+
+pub msg TestClockMsg {
+    #[selector = sol("setNow(uint256)")]
+    SetNow { now: Timestamp },
+}
+
+pub contract AnyOrderTestClock uses (ctx: Ctx, call: mut Call, log: mut Log) {
+    mut settings: Settings,
+    mut book: Book,
+    mut funds: Funds,
+    mut guard: Guard,
+    mut test_now: Timestamp,
+
+    init(
+        token: Address,
+        genesis: Timestamp,
+        batch_length: Duration,
+        max_orders: u256,
+        min_quantity: u256,
+        max_price: u256,
+    )
+    uses (mut settings, mut test_now)
+    {
+        assert!(batch_length > Duration::zero(), "batch length is zero")
+        assert!(
+            max_orders > 0 && max_orders <= MAX_ORDERS_CAP,
+            "max orders out of range",
+        )
+        assert!(min_quantity > 0, "min quantity is zero")
+        assert!(max_price > 0, "max price is zero")
+        settings.token = token
+        settings.genesis = genesis
+        settings.batch_length = batch_length
+        settings.max_orders = max_orders
+        settings.min_quantity = min_quantity
+        settings.max_price = max_price
+        test_now = genesis
+    }
+
+    recv TestClockMsg {
+        SetNow { now } uses (mut test_now) {
+            assert!(now >= test_now, "test time only moves forward")
+            test_now = now
+        }
+    }
+
+    recv AnyOrderMsg {
+        #[payable]
+        DepositEth uses (ctx, mut funds, mut log) {
+            deposit_eth(owner: ctx.caller(), amount: ctx.value())
+        }
+
+        DepositToken { amount } uses (ctx, mut call, settings, mut funds, mut log) {
+            deposit_token(owner: ctx.caller(), amount)
+        }
+
+        Withdraw { base, quote } uses (ctx, mut call, settings, mut funds, mut guard, mut log) {
+            withdraw(owner: ctx.caller(), base, quote)
+        }
+
+        PlaceBuy { limit, quantity } -> OrderRef uses (
+            ctx,
+            test_now,
+            settings,
+            mut book,
+            mut funds,
+            mut log,
+        ) {
+            with (Clock { now: test_now }) {
+                place(owner: ctx.caller(), is_buy: true, limit, quantity)
+            }
+        }
+
+        PlaceSell { limit, quantity } -> OrderRef
+        uses (ctx, test_now, settings, mut book, mut funds, mut log)
+        {
+            with (Clock { now: test_now }) {
+                place(owner: ctx.caller(), is_buy: false, limit, quantity)
+            }
+        }
+
+        Clear { batch } -> ClearingView uses (test_now, settings, mut book, mut log) {
+            with (Clock { now: test_now }) {
+                clear_batch(batch)
+            }
+        }
+
+        Claim { batch, index } -> Payout uses (mut book, mut funds, mut log) {
+            claim(batch, index)
+        }
+
+        Config -> ConfigView uses (settings) {
+            config_view()
+        }
+
+        CurrentBatch -> u256 uses (test_now, settings) {
+            with (Clock { now: test_now }) {
+                current_batch()
+            }
+        }
+
+        BatchInfo { batch } -> BatchView uses (test_now, settings, book) {
+            with (Clock { now: test_now }) {
+                batch_view(batch)
+            }
+        }
+
+        OrderAt { batch, index } -> OrderView uses (book) {
+            order_view(batch, index)
+        }
+
+        Preview { batch } -> ClearingView uses (book) {
+            preview(batch)
+        }
+
+        Balances { owner } -> BalancesView uses (funds) {
+            balances_view(owner)
+        }
+    }
+}

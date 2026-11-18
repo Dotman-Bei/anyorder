@@ -1,0 +1,357 @@
+//! The exchange's handlers as free functions. Their `uses` clauses are the
+//! point: only `deposit_token` and `withdraw` hold `Call`, so they are the
+//! only functions that can move funds out of or into the contract. Placing,
+//! clearing and claiming change storage and nothing else.
+
+use core::ptr::MemVec
+use std::evm::erc20
+use anyorder_clearing::{MAX_QUANTITY, Order, allocate, cost_ceil, proceeds_floor, select_price}
+use ingot::interface::{
+    AboveMaximum,
+    AlreadyClaimed,
+    AlreadyCleared,
+    BatchCleared,
+    BatchFull,
+    BatchStillOpen,
+    BatchView,
+    BelowMinimum,
+    BalancesView,
+    Claimed,
+    ClearingView,
+    ConfigView,
+    Deposited,
+    InsufficientFunds,
+    NotCleared,
+    OrderPlaced,
+    OrderRef,
+    OrderView,
+    Payout,
+    PriceOutOfRange,
+    Reentrant,
+    TransferFailed,
+    UnknownOrder,
+    Withdrawn,
+    ZeroAmount,
+}
+use ingot::state::{BatchSlot, Book, Clock, Funds, Guard, OrderSlot, Settings}
+
+/// The batch that `clock.now` falls in: batch k covers
+/// [genesis + k * length, genesis + (k + 1) * length).
+pub fn current_batch() -> u256 uses (clock: Clock, settings: Settings) {
+    (clock.now - settings.genesis).as_seconds() / settings.batch_length.as_seconds()
+}
+
+pub fn batch_start(batch: u256) -> Timestamp uses (settings: Settings) {
+    settings.genesis + settings.batch_length * batch
+}
+
+pub fn batch_end(batch: u256) -> Timestamp uses (settings: Settings) {
+    settings.genesis + settings.batch_length * (batch + 1)
+}
+
+pub fn deposit_eth(owner: Address, amount: Wei)
+uses (funds: mut Funds, log: mut Log)
+{
+    if amount == Wei::zero() {
+        revert_error(ZeroAmount {})
+    }
+    funds.quote.set(key: owner, value: funds.quote.get(key: owner) + amount)
+    log.emit(Deposited { owner, base: 0, quote: amount })
+}
+
+pub fn deposit_token(owner: Address, amount: u256)
+uses (ctx: Ctx, call: mut Call, settings: Settings, funds: mut Funds, log: mut Log)
+{
+    if amount == 0 {
+        revert_error(ZeroAmount {})
+    }
+    erc20::safe_transfer_from(
+        token: settings.token,
+        owner,
+        receiver: ctx.address(),
+        amount,
+    )
+    funds.base.set(key: owner, value: funds.base.get(key: owner) + amount)
+    log.emit(Deposited { owner, base: amount, quote: Wei::zero() })
+}
+
+/// Pays `base` tokens and `quote` wei out of `owner`'s free balances. State is
+/// final before either external call, and a transient lock refuses reentry.
+pub fn withdraw(owner: Address, base: u256, quote: Wei)
+uses (
+    ctx: Ctx,
+    call: mut Call,
+    settings: Settings,
+    funds: mut Funds,
+    guard: mut Guard,
+    log: mut Log,
+)
+{
+    if guard.entered.value {
+        revert_error(Reentrant {})
+    }
+    guard.entered.value = true
+    if base == 0 && quote == Wei::zero() {
+        revert_error(ZeroAmount {})
+    }
+    let free_base = funds.base.get(key: owner)
+    if base > free_base {
+        revert_error(InsufficientFunds { available: free_base, required: base })
+    }
+    let free_quote = funds.quote.get(key: owner)
+    if quote > free_quote {
+        revert_error(
+            InsufficientFunds { available: free_quote.as_wei(), required: quote.as_wei() },
+        )
+    }
+    funds.base.set(key: owner, value: free_base - base)
+    funds.quote.set(key: owner, value: free_quote - quote)
+    if base > 0 {
+        erc20::safe_transfer(token: settings.token, receiver: owner, amount: base)
+    }
+    if quote > Wei::zero() {
+        if !call.send_value(addr: owner, gas: 50000, value: quote).success() {
+            revert_error(TransferFailed {})
+        }
+    }
+    log.emit(Withdrawn { owner, base, quote })
+    guard.entered.value = false
+}
+
+/// Places a limit order in the current batch, locking its funds. No `Call`:
+/// placing an order cannot move funds.
+pub fn place(owner: Address, is_buy: bool, limit: u256, quantity: u256) -> OrderRef
+uses (clock: Clock, settings: Settings, book: mut Book, funds: mut Funds, log: mut Log)
+{
+    if quantity < settings.min_quantity {
+        revert_error(BelowMinimum { quantity, minimum: settings.min_quantity })
+    }
+    if quantity > MAX_QUANTITY {
+        revert_error(AboveMaximum { quantity, maximum: MAX_QUANTITY })
+    }
+    if limit == 0 || limit > settings.max_price {
+        revert_error(PriceOutOfRange { limit, max_price: settings.max_price })
+    }
+    let batch = current_batch()
+    let slot = book.batches.get(key: batch)
+    if slot.count >= settings.max_orders {
+        revert_error(BatchFull { batch, max_orders: settings.max_orders })
+    }
+    var locked = Wei::zero()
+    if is_buy {
+        locked = cost_ceil(quantity, price: limit)
+        let free = funds.quote.get(key: owner)
+        if locked > free {
+            revert_error(
+                InsufficientFunds { available: free.as_wei(), required: locked.as_wei() },
+            )
+        }
+        funds.quote.set(key: owner, value: free - locked)
+    } else {
+        let free = funds.base.get(key: owner)
+        if quantity > free {
+            revert_error(InsufficientFunds { available: free, required: quantity })
+        }
+        funds.base.set(key: owner, value: free - quantity)
+    }
+    let owner_seq = book.seqs.get(key: owner)
+    book.seqs.set(key: owner, value: owner_seq + 1)
+    let index = slot.count
+    book.orders
+        .set(
+            key: (batch, index),
+            value: OrderSlot {
+                owner,
+                is_buy,
+                limit,
+                quantity,
+                owner_seq,
+                locked,
+                filled: 0,
+                claimed: false,
+            },
+        )
+    book.batches
+        .set(
+            key: batch,
+            value: BatchSlot {
+                count: index + 1,
+                cleared: false,
+                traded: false,
+                price: 0,
+                volume: 0,
+            },
+        )
+    log.emit(
+        OrderPlaced { batch, owner, index, is_buy, limit, quantity },
+    )
+    OrderRef { batch, index }
+}
+
+/// The orders of a batch as clearing sees them: contents only.
+pub fn load_orders(batch: u256, count: u256) -> MemVec<Order> uses (book: Book) {
+    var orders = MemVec<Order>::new()
+    var i: u256 = 0
+    while i < count {
+        let o = book.orders.get(key: (batch, i))
+        orders
+            .push(
+                Order {
+                    is_buy: o.is_buy,
+                    limit: o.limit,
+                    quantity: o.quantity,
+                    owner: o.owner.word(),
+                    owner_seq: o.owner_seq,
+                },
+            )
+        i += 1
+    }
+    orders
+}
+
+/// Clears a closed batch. Anyone may call it once the batch has ended. No
+/// `Call`, and the clock is the only thing it reads besides the book.
+pub fn clear_batch(batch: u256) -> ClearingView
+uses (clock: Clock, settings: Settings, book: mut Book, log: mut Log)
+{
+    if batch >= current_batch() {
+        revert_error(
+            BatchStillOpen { batch, ends_at: batch_end(batch).as_seconds() },
+        )
+    }
+    let slot = book.batches.get(key: batch)
+    if slot.cleared {
+        revert_error(AlreadyCleared { batch })
+    }
+    let orders = load_orders(batch, count: slot.count)
+    let c = select_price(orders)
+    let fills = allocate(orders, c)
+    var i: u256 = 0
+    while i < slot.count {
+        let filled = fills[i.downcast_unchecked()]
+        if filled > 0 {
+            var o = book.orders.get(key: (batch, i))
+            o.filled = filled
+            book.orders.set(key: (batch, i), value: o)
+        }
+        i += 1
+    }
+    book.batches
+        .set(
+            key: batch,
+            value: BatchSlot {
+                count: slot.count,
+                cleared: true,
+                traded: c.traded,
+                price: c.price,
+                volume: c.volume,
+            },
+        )
+    log.emit(
+        BatchCleared { batch, traded: c.traded, price: c.price, volume: c.volume },
+    )
+    ClearingView { traded: c.traded, price: c.price, volume: c.volume }
+}
+
+/// Settles one order of a cleared batch into its owner's free balances.
+/// Anyone may call it; the proceeds always go to the order's owner.
+pub fn claim(batch: u256, index: u256) -> Payout
+uses (book: mut Book, funds: mut Funds, log: mut Log)
+{
+    let slot = book.batches.get(key: batch)
+    if !slot.cleared {
+        revert_error(NotCleared { batch })
+    }
+    if index >= slot.count {
+        revert_error(UnknownOrder { batch, index })
+    }
+    var o = book.orders.get(key: (batch, index))
+    if o.claimed {
+        revert_error(AlreadyClaimed { batch, index })
+    }
+    o.claimed = true
+    book.orders.set(key: (batch, index), value: o)
+    var payout = Payout { base: 0, quote: Wei::zero() }
+    if o.is_buy {
+        let paid = cost_ceil(quantity: o.filled, price: slot.price)
+        payout = Payout { base: o.filled, quote: o.locked - paid }
+    } else {
+        payout = Payout {
+            base: o.quantity - o.filled,
+            quote: proceeds_floor(quantity: o.filled, price: slot.price),
+        }
+    }
+    funds.base.set(
+            key: o.owner,
+            value: funds.base.get(key: o.owner) + payout.base,
+        )
+    funds.quote.set(
+            key: o.owner,
+            value: funds.quote.get(key: o.owner) + payout.quote,
+        )
+    log.emit(
+        Claimed { batch, owner: o.owner, index, base: payout.base, quote: payout.quote },
+    )
+    payout
+}
+
+/// The clearing a batch would get right now: the same pure functions on the
+/// stored book, read-only.
+pub fn preview(batch: u256) -> ClearingView uses (book: Book) {
+    let slot = book.batches.get(key: batch)
+    let c = select_price(load_orders(batch, count: slot.count))
+    ClearingView { traded: c.traded, price: c.price, volume: c.volume }
+}
+
+pub fn config_view() -> ConfigView uses (settings: Settings) {
+    ConfigView {
+        token: settings.token,
+        genesis: settings.genesis,
+        batch_length: settings.batch_length,
+        max_orders: settings.max_orders,
+        min_quantity: settings.min_quantity,
+        max_price: settings.max_price,
+    }
+}
+
+pub fn batch_view(batch: u256) -> BatchView
+uses (clock: Clock, settings: Settings, book: Book)
+{
+    let slot = book.batches.get(key: batch)
+    var status: u8 = 0
+    if slot.cleared {
+        status = 2
+    } else if batch < current_batch() {
+        status = 1
+    }
+    BatchView {
+        start: batch_start(batch),
+        end: batch_end(batch),
+        order_count: slot.count,
+        status,
+        traded: slot.traded,
+        price: slot.price,
+        volume: slot.volume,
+    }
+}
+
+pub fn order_view(batch: u256, index: u256) -> OrderView uses (book: Book) {
+    if index >= book.batches.get(key: batch).count {
+        revert_error(UnknownOrder { batch, index })
+    }
+    let o = book.orders.get(key: (batch, index))
+    OrderView {
+        owner: o.owner,
+        is_buy: o.is_buy,
+        limit: o.limit,
+        quantity: o.quantity,
+        owner_seq: o.owner_seq,
+        locked: o.locked,
+        filled: o.filled,
+        claimed: o.claimed,
+    }
+}
+
+pub fn balances_view(owner: Address) -> BalancesView uses (funds: Funds) {
+    BalancesView { base: funds.base.get(key: owner), quote: funds.quote.get(key: owner) }
+}

@@ -1,0 +1,245 @@
+//! Multi-actor lifecycle: deposit, place, clear, claim, withdraw, and every
+//! revert path with its exact error selector.
+
+use std::evm::{ether, seconds, wei}
+use ingot::actors::TraderMsg
+use ingot::anyorder::AnyOrder
+use ingot::harness::{
+    MAX_PRICE,
+    MILLI,
+    T,
+    balances,
+    batch_info,
+    claim,
+    clear,
+    deploy_exchange,
+    deploy_token,
+    fund_eth,
+    fund_tokens,
+    new_trader,
+    order_at,
+    place_buy,
+    place_sell,
+    set_time,
+    token_balance,
+}
+use ingot::interface::{AnyOrderMsg, ConfigView}
+
+#[test(balance = 10_000_000_000_000_000_000)]
+fn lifecycle_deposit_place_clear_claim_withdraw() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    let seller = new_trader(salt: 2)
+    let buyer = new_trader(salt: 3)
+    fund_tokens(token, exchange, trader: seller, amount: 10 * T)
+    fund_eth(exchange, trader: buyer, amount: wei(48 * MILLI))
+
+    let s = place_sell(
+        exchange,
+        trader: seller,
+        limit: 11 * MILLI,
+        quantity: 10 * T,
+    )
+    let b = place_buy(
+        exchange,
+        trader: buyer,
+        limit: 12 * MILLI,
+        quantity: 4 * T,
+    )
+    assert!(s.batch == 0 && s.index == 0 && b.index == 1)
+    // The buy locked 4 tokens at its limit: 0.048 ETH, nothing left free.
+    assert!(balances(exchange, owner: buyer).quote == Wei::zero())
+    assert!(
+        order_at(exchange, batch: 0, index: 1).locked == wei(48 * MILLI),
+    )
+    assert!(batch_info(exchange, batch: 0).status == 0)
+
+    set_time(exchange, now: 60)
+    assert!(batch_info(exchange, batch: 0).status == 1)
+    let c = clear(exchange, batch: 0)
+    // Excess supply at both candidates, so the lowest wins: 0.011 ETH.
+    assert!(c.traded && c.price == 11 * MILLI && c.volume == 4 * T)
+    assert!(batch_info(exchange, batch: 0).status == 2)
+
+    let pb = claim(exchange, batch: 0, index: 1)
+    assert!(pb.base == 4 * T && pb.quote == wei(4 * MILLI))
+    let ps = claim(exchange, batch: 0, index: 0)
+    assert!(ps.base == 6 * T && ps.quote == wei(44 * MILLI))
+
+    evm.call(
+        addr: buyer,
+        gas: 500000,
+        value: Wei::zero(),
+        message: TraderMsg::Withdraw { exchange, base: 4 * T, quote: wei(4 * MILLI) },
+    )
+    evm.call(
+        addr: seller,
+        gas: 500000,
+        value: Wei::zero(),
+        message: TraderMsg::Withdraw { exchange, base: 6 * T, quote: wei(44 * MILLI) },
+    )
+    assert!(token_balance(token, account: buyer) == 4 * T)
+    assert!(token_balance(token, account: seller) == 6 * T)
+    assert!(evm.balance(buyer) == wei(4 * MILLI))
+    assert!(evm.balance(seller) == wei(44 * MILLI))
+    assert!(evm.balance(exchange) == Wei::zero())
+    assert!(token_balance(token, account: exchange) == 0)
+}
+
+#[test(balance = 10_000_000_000_000_000_000)]
+fn lifecycle_production_contract_open_phase() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = evm
+        .create2<AnyOrder>(
+            value: Wei::zero(),
+            args: (token, evm.timestamp(), seconds(60), 16, 1, MAX_PRICE),
+            salt: 1,
+        )
+    let cfg: ConfigView = evm
+        .call(
+            addr: exchange,
+            gas: 100000,
+            value: Wei::zero(),
+            message: AnyOrderMsg::Config {},
+        )
+    assert!(cfg.token == token && cfg.max_orders == 16)
+    let buyer = new_trader(salt: 2)
+    fund_eth(exchange, trader: buyer, amount: ether(1))
+    let b = place_buy(exchange, trader: buyer, limit: 12 * MILLI, quantity: T)
+    let now: u256 = evm
+        .call(
+            addr: exchange,
+            gas: 100000,
+            value: Wei::zero(),
+            message: AnyOrderMsg::CurrentBatch {},
+        )
+    assert!(b.batch == now)
+    // The batch that holds the order is still open: clearing it reverts.
+    let r = evm
+        .try_call(
+            addr: exchange,
+            gas: 1000000,
+            value: Wei::zero(),
+            message: AnyOrderMsg::Clear { batch: now },
+        )
+    assert!(!r.success())
+}
+
+#[test(should_revert, selector = 0xbd49034f, balance = 10_000_000_000_000_000_000)]
+fn revert_below_minimum() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = evm
+        .create2<AnyOrder>(
+            value: Wei::zero(),
+            args: (token, evm.timestamp(), seconds(60), 16, 5, MAX_PRICE),
+            salt: 1,
+        )
+    let buyer = new_trader(salt: 2)
+    fund_eth(exchange, trader: buyer, amount: ether(1))
+    let _ = place_buy(exchange, trader: buyer, limit: 12 * MILLI, quantity: 4)
+}
+
+#[test(should_revert, selector = 0x9c6cd57b, balance = 10_000_000_000_000_000_000)]
+fn revert_price_out_of_range() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    let buyer = new_trader(salt: 2)
+    fund_eth(exchange, trader: buyer, amount: ether(1))
+    let _ = place_buy(exchange, trader: buyer, limit: MAX_PRICE + 1, quantity: 1)
+}
+
+#[test(should_revert, selector = 0x03eb8b54, balance = 10_000_000_000_000_000_000)]
+fn revert_place_insufficient_funds() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    let buyer = new_trader(salt: 2)
+    fund_eth(exchange, trader: buyer, amount: wei(47 * MILLI))
+    let _ = place_buy(
+        exchange,
+        trader: buyer,
+        limit: 12 * MILLI,
+        quantity: 4 * T,
+    )
+}
+
+#[test(should_revert, selector = 0xdba84217, balance = 10_000_000_000_000_000_000)]
+fn revert_batch_full() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 2, salt: 1)
+    let buyer = new_trader(salt: 2)
+    fund_eth(exchange, trader: buyer, amount: ether(1))
+    let _ = place_buy(exchange, trader: buyer, limit: 12 * MILLI, quantity: T)
+    let _ = place_buy(exchange, trader: buyer, limit: 12 * MILLI, quantity: T)
+    let _ = place_buy(exchange, trader: buyer, limit: 12 * MILLI, quantity: T)
+}
+
+#[test(should_revert, selector = 0x1fdae862)]
+fn revert_clear_still_open() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    set_time(exchange, now: 59)
+    let _ = clear(exchange, batch: 0)
+}
+
+#[test(should_revert, selector = 0x4813055c)]
+fn revert_clear_twice() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    set_time(exchange, now: 60)
+    let _ = clear(exchange, batch: 0)
+    let _ = clear(exchange, batch: 0)
+}
+
+#[test(should_revert, selector = 0xfc8d5c0d, balance = 10_000_000_000_000_000_000)]
+fn revert_claim_before_clear() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    let buyer = new_trader(salt: 2)
+    fund_eth(exchange, trader: buyer, amount: ether(1))
+    let _ = place_buy(exchange, trader: buyer, limit: 12 * MILLI, quantity: T)
+    let _ = claim(exchange, batch: 0, index: 0)
+}
+
+#[test(should_revert, selector = 0x927e5636)]
+fn revert_claim_unknown_order() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    set_time(exchange, now: 60)
+    let _ = clear(exchange, batch: 0)
+    let _ = claim(exchange, batch: 0, index: 0)
+}
+
+#[test(should_revert, selector = 0x6bd4745f, balance = 10_000_000_000_000_000_000)]
+fn revert_claim_twice() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    let buyer = new_trader(salt: 2)
+    fund_eth(exchange, trader: buyer, amount: ether(1))
+    let _ = place_buy(exchange, trader: buyer, limit: 12 * MILLI, quantity: T)
+    set_time(exchange, now: 60)
+    let _ = clear(exchange, batch: 0)
+    let _ = claim(exchange, batch: 0, index: 0)
+    let _ = claim(exchange, batch: 0, index: 0)
+}
+
+#[test(should_revert, selector = 0x03eb8b54, balance = 10_000_000_000_000_000_000)]
+fn revert_withdraw_more_than_free() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    let buyer = new_trader(salt: 2)
+    fund_eth(exchange, trader: buyer, amount: wei(10 * MILLI))
+    evm.call(
+        addr: buyer,
+        gas: 500000,
+        value: Wei::zero(),
+        message: TraderMsg::Withdraw { exchange, base: 0, quote: wei(11 * MILLI) },
+    )
+}
+
+#[test(should_revert, selector = 0x1f2a2005)]
+fn revert_zero_deposit() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    let buyer = new_trader(salt: 2)
+    fund_eth(exchange, trader: buyer, amount: Wei::zero())
+}

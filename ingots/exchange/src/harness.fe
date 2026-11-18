@@ -1,0 +1,173 @@
+//! TEST ONLY. Helpers that deploy the test contracts and drive them through
+//! `Trader` proxies, so each test reads as the scenario it checks.
+
+use std::evm::seconds
+use ingot::actors::{Trader, TraderMsg}
+use ingot::interface::{
+    AnyOrderMsg,
+    BalancesView,
+    BatchView,
+    ClearingView,
+    OrderRef,
+    OrderView,
+    Payout,
+}
+use ingot::testclock::{AnyOrderTestClock, TestClockMsg}
+use ingot::token::{TestToken, TokenMsg}
+
+/// One whole token, in base units.
+pub const T: u256 = 1_000_000_000_000_000_000
+/// 0.001 ETH, in wei: prices in the tests are multiples of it.
+pub const MILLI: u256 = 1_000_000_000_000_000
+/// Batch length in the tests, in seconds.
+pub const BATCH_SECONDS: u256 = 60
+/// The highest limit price the test exchanges accept (1,000 ETH per token).
+pub const MAX_PRICE: u256 = 1_000_000_000_000_000_000_000
+
+pub fn deploy_token(salt: u256) -> Address uses (evm: mut Evm) {
+    evm.create2<TestToken>(value: Wei::zero(), args: (), salt)
+}
+
+/// A test-clock exchange with genesis 0, 60-second batches and `max_orders`.
+pub fn deploy_exchange(token: Address, max_orders: u256, salt: u256) -> Address
+uses (evm: mut Evm)
+{
+    evm.create2<AnyOrderTestClock>(
+        value: Wei::zero(),
+        args: (token, Timestamp::from_seconds(0), seconds(BATCH_SECONDS), max_orders, 1, MAX_PRICE),
+        salt,
+    )
+}
+
+pub fn new_trader(salt: u256) -> Address uses (evm: mut Evm) {
+    evm.create2<Trader>(value: Wei::zero(), args: (), salt)
+}
+
+/// Mints `amount` tokens to `trader` and deposits them into `exchange`.
+pub fn fund_tokens(token: Address, exchange: Address, trader: Address, amount: u256)
+uses (evm: mut Evm)
+{
+    let minted: bool = evm
+        .call(
+            addr: token,
+            gas: 200000,
+            value: Wei::zero(),
+            message: TokenMsg::Mint { to: trader, amount },
+        )
+    assert!(minted)
+    evm.call(
+        addr: trader,
+        gas: 200000,
+        value: Wei::zero(),
+        message: TraderMsg::ApproveToken { token, spender: exchange, amount },
+    )
+    evm.call(
+        addr: trader,
+        gas: 300000,
+        value: Wei::zero(),
+        message: TraderMsg::DepositToken { exchange, amount },
+    )
+}
+
+/// Sends `amount` wei from the test runner through `trader` into `exchange`.
+pub fn fund_eth(exchange: Address, trader: Address, amount: Wei)
+uses (evm: mut Evm)
+{
+    evm.call(
+        addr: trader,
+        gas: 200000,
+        value: amount,
+        message: TraderMsg::DepositEth { exchange },
+    )
+}
+
+pub fn place_buy(exchange: Address, trader: Address, limit: u256, quantity: u256) -> OrderRef
+uses (evm: mut Evm)
+{
+    evm.call(
+        addr: trader,
+        gas: 1000000,
+        value: Wei::zero(),
+        message: TraderMsg::PlaceBuy { exchange, limit, quantity },
+    )
+}
+
+pub fn place_sell(exchange: Address, trader: Address, limit: u256, quantity: u256) -> OrderRef
+uses (evm: mut Evm)
+{
+    evm.call(
+        addr: trader,
+        gas: 1000000,
+        value: Wei::zero(),
+        message: TraderMsg::PlaceSell { exchange, limit, quantity },
+    )
+}
+
+pub fn set_time(exchange: Address, now: u256) uses (evm: mut Evm) {
+    evm.call(
+        addr: exchange,
+        gas: 100000,
+        value: Wei::zero(),
+        message: TestClockMsg::SetNow { now: Timestamp::from_seconds(now) },
+    )
+}
+
+pub fn clear(exchange: Address, batch: u256) -> ClearingView uses (evm: mut Evm) {
+    evm.call(
+        addr: exchange,
+        gas: 30000000,
+        value: Wei::zero(),
+        message: AnyOrderMsg::Clear { batch },
+    )
+}
+
+pub fn claim(exchange: Address, batch: u256, index: u256) -> Payout
+uses (evm: mut Evm)
+{
+    evm.call(
+        addr: exchange,
+        gas: 500000,
+        value: Wei::zero(),
+        message: AnyOrderMsg::Claim { batch, index },
+    )
+}
+
+pub fn balances(exchange: Address, owner: Address) -> BalancesView
+uses (evm: mut Evm)
+{
+    evm.call(
+        addr: exchange,
+        gas: 100000,
+        value: Wei::zero(),
+        message: AnyOrderMsg::Balances { owner },
+    )
+}
+
+pub fn batch_info(exchange: Address, batch: u256) -> BatchView uses (evm: mut Evm) {
+    evm.call(
+        addr: exchange,
+        gas: 100000,
+        value: Wei::zero(),
+        message: AnyOrderMsg::BatchInfo { batch },
+    )
+}
+
+pub fn order_at(exchange: Address, batch: u256, index: u256) -> OrderView
+uses (evm: mut Evm)
+{
+    evm.call(
+        addr: exchange,
+        gas: 100000,
+        value: Wei::zero(),
+        message: AnyOrderMsg::OrderAt { batch, index },
+    )
+}
+
+pub fn token_balance(token: Address, account: Address) -> u256 uses (evm: mut Evm) {
+    evm.call(
+        addr: token,
+        gas: 100000,
+        value: Wei::zero(),
+        message: TokenMsg::BalanceOf { account },
+    )
+}

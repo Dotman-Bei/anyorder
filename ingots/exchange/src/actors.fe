@@ -1,0 +1,182 @@
+//! TEST ONLY. `Trader` is a proxy actor: `fe test` cannot impersonate
+//! addresses, so each trader in a test is its own contract and forwards calls
+//! to the exchange, the pool and the token. Pattern from the v26.6.0 test
+//! fixtures `ownable.fe` and `escrow.fe` (Apache-2.0). Never deployed by the
+//! local run or the dApp.
+
+use std::abi::sol
+use ingot::interface::{AnyOrderMsg, OrderRef, Payout}
+use ingot::pool::PoolMsg
+use ingot::token::TokenMsg
+
+pub msg TraderMsg {
+    #[selector = sol("approveToken(address,address,uint256)")]
+    ApproveToken { token: Address, spender: Address, amount: u256 },
+    #[selector = sol("depositToken(address,uint256)")]
+    DepositToken { exchange: Address, amount: u256 },
+    #[selector = sol("depositEth(address)")]
+    DepositEth { exchange: Address },
+    #[selector = sol("placeBuy(address,uint256,uint256)")]
+    PlaceBuy { exchange: Address, limit: u256, quantity: u256 } -> OrderRef,
+    #[selector = sol("placeSell(address,uint256,uint256)")]
+    PlaceSell { exchange: Address, limit: u256, quantity: u256 } -> OrderRef,
+    #[selector = sol("claim(address,uint256,uint256)")]
+    Claim { exchange: Address, batch: u256, index: u256 } -> Payout,
+    #[selector = sol("withdraw(address,uint256,uint256)")]
+    Withdraw { exchange: Address, base: u256, quote: Wei },
+    #[selector = sol("poolBuy(address,uint256)")]
+    PoolBuy { pool: Address, min_out: u256 } -> u256,
+    #[selector = sol("poolSell(address,uint256,uint256)")]
+    PoolSell { pool: Address, amount: u256, min_out: Wei } -> Wei,
+}
+
+pub contract Trader uses (ctx: Ctx, call: mut Call) {
+    recv TraderMsg {
+        ApproveToken { token, spender, amount } uses (mut call) {
+            let ok: bool = call
+                .call(
+                    addr: token,
+                    gas: 100000,
+                    value: Wei::zero(),
+                    message: TokenMsg::Approve { spender, amount },
+                )
+            assert!(ok, "approve failed")
+        }
+
+        DepositToken { exchange, amount } uses (mut call) {
+            call.call(
+                addr: exchange,
+                gas: 200000,
+                value: Wei::zero(),
+                message: AnyOrderMsg::DepositToken { amount },
+            )
+        }
+
+        #[payable]
+        DepositEth { exchange } uses (ctx, mut call) {
+            call.call(
+                addr: exchange,
+                gas: 100000,
+                value: ctx.value(),
+                message: AnyOrderMsg::DepositEth {},
+            )
+        }
+
+        PlaceBuy { exchange, limit, quantity } -> OrderRef
+        uses (mut call)
+        {
+            call.call(
+                addr: exchange,
+                gas: 500000,
+                value: Wei::zero(),
+                message: AnyOrderMsg::PlaceBuy { limit, quantity },
+            )
+        }
+
+        PlaceSell { exchange, limit, quantity } -> OrderRef
+        uses (mut call)
+        {
+            call.call(
+                addr: exchange,
+                gas: 500000,
+                value: Wei::zero(),
+                message: AnyOrderMsg::PlaceSell { limit, quantity },
+            )
+        }
+
+        Claim { exchange, batch, index } -> Payout
+        uses (mut call)
+        {
+            call.call(
+                addr: exchange,
+                gas: 300000,
+                value: Wei::zero(),
+                message: AnyOrderMsg::Claim { batch, index },
+            )
+        }
+
+        Withdraw { exchange, base, quote } uses (mut call) {
+            call.call(
+                addr: exchange,
+                gas: 300000,
+                value: Wei::zero(),
+                message: AnyOrderMsg::Withdraw { base, quote },
+            )
+        }
+
+        #[payable]
+        PoolBuy { pool, min_out } -> u256 uses (ctx, mut call) {
+            call.call(
+                addr: pool,
+                gas: 300000,
+                value: ctx.value(),
+                message: PoolMsg::BuyTokens { min_out },
+            )
+        }
+
+        PoolSell { pool, amount, min_out } -> Wei
+        uses (mut call)
+        {
+            call.call(
+                addr: pool,
+                gas: 300000,
+                value: Wei::zero(),
+                message: PoolMsg::SellTokens { amount, min_out },
+            )
+        }
+    }
+
+    recv {
+        #[payable]
+        _ {}
+    }
+}
+
+pub msg ReentererMsg {
+    #[selector = sol("arm(address,uint256)")]
+    Arm { exchange: Address, quote: Wei },
+    #[selector = sol("pull(address,uint256)")]
+    Pull { exchange: Address, quote: Wei },
+}
+
+/// TEST ONLY. A hostile payee: when the exchange pays it ETH, its fallback
+/// calls `withdraw` again. The transient lock must refuse the second entry.
+pub contract Reenterer uses (ctx: Ctx, call: mut Call) {
+    mut target: Address,
+    mut amount: Wei,
+
+    recv ReentererMsg {
+        #[payable]
+        Arm { exchange, quote } uses (ctx, mut call, mut target, mut amount) {
+            target = exchange
+            amount = quote
+            call.call(
+                addr: exchange,
+                gas: 100000,
+                value: ctx.value(),
+                message: AnyOrderMsg::DepositEth {},
+            )
+        }
+
+        Pull { exchange, quote } uses (mut call) {
+            call.call(
+                addr: exchange,
+                gas: 300000,
+                value: Wei::zero(),
+                message: AnyOrderMsg::Withdraw { base: 0, quote },
+            )
+        }
+    }
+
+    recv {
+        #[payable]
+        _ uses (mut call, target, amount) {
+            call.call(
+                addr: target,
+                gas: 40000,
+                value: Wei::zero(),
+                message: AnyOrderMsg::Withdraw { base: 0, quote: amount },
+            )
+        }
+    }
+}
