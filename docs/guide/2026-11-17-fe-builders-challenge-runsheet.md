@@ -80,3 +80,11 @@ User: (1) **register NOW** (closes 2026-11-18 00:59 WAT) with name "AnyOrder" + 
 - (history) User authorised the architect session to install `fe` 26.6.0 for them (2026-11-17 ~23:10 WAT): scoped to the official release exe, user-scope PATH append only, tollgate row 19 updated by that session. Guide re-probes row 19 afterwards.
 - Architect Q1 answered: commit only loaded runtime assets, unmodified, under web/public/assets/ + MIT notice; skill files never copied.
 - `fe` not installed (confirmed absent 2026-11-17 22:21 WAT): degraded for Step 1, hard block for Step 2.
+
+## Step 1 architect: reviewed by the guide, 2026-11-18
+
+- Architect commit `40fbf06`: 3 specs, 4 plans, `docs/superpowers/manifest.json` (26 tasks: core 12, dapp 10, docs 2, stretch 2; no `human_gate`), tollgate §3 stack rows S1-S10 (all PASS at Step 1), `docs/gates/submission-draft.md`.
+- Guide checks that passed: DAG shape and `depends_on` in the manifest; xhigh tasks pinned `top`; every dApp UI task (5-10) tells its executor to read the skill's SKILL.md in full and ends on `GATE: PASS` plus the section 5 checklist; no other design skill or library is named for visuals; the curve chart strokes use `currentColor` (no hard-coded colours); submission draft answers every contest field and holds no email or submission code.
+- Decision to confirm: the architect pinned the taste deal (palette lunar-grey-bronze, type mona = Mona Sans + Geist Mono, sharp radius, sage ground). Not the palette or type of nightcrew, stigi or basanos. Fiador and the other shipped products were not compared.
+- Calendar: sub-project A about 11 task-hours Wed-Fri (11-18 to 11-20); the dApp's UI tasks run Sat-Mon; docs Mon; submission by Tue 11-24 18:00 UTC. dapp:5 (app shell) is expected to be the slowest task.
+- Next: throwaway tab copies `references/agents/executor-*.md` into the repo's `.claude/agents/`, then the Step 2 orchestrator kickoff (opus / high, autonomous or checkpoint review mode).
