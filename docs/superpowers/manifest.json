@@ -1,0 +1,1036 @@
+{
+  "project": "anyorder",
+  "repo": "Dotman-Bei/anyorder",
+  "spec": "docs/superpowers/specs/2026-11-18-anyorder-core-design.md",
+  "specs": [
+    "docs/superpowers/specs/2026-11-18-anyorder-core-design.md",
+    "docs/superpowers/specs/2026-11-18-anyorder-dapp-design.md",
+    "docs/superpowers/specs/2026-11-18-anyorder-docs-stretch-design.md"
+  ],
+  "subsystems": [
+    "core",
+    "dapp",
+    "docs",
+    "stretch"
+  ],
+  "tasks": [
+    {
+      "id": "core:1",
+      "subsystem": "core",
+      "title": "Walking skeleton: workspace, starter files, one pure function, one proxy-actor test",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [],
+      "effort": "medium",
+      "files": {
+        "create": [
+          ".gitattributes",
+          ".gitignore",
+          "LICENSE",
+          "SUBMISSION.md",
+          ".github/workflows/ci.yml",
+          "fe.toml",
+          "ingots/clearing/fe.toml",
+          "ingots/clearing/src/lib.fe",
+          "ingots/clearing/src/types.fe",
+          "ingots/clearing/src/money.fe",
+          "ingots/exchange/fe.toml",
+          "ingots/exchange/src/lib.fe",
+          "ingots/exchange/src/token.fe"
+        ],
+        "modify": [],
+        "test": [
+          "ingots/clearing/src/money_tests.fe",
+          "ingots/exchange/src/token_tests.fe"
+        ]
+      },
+      "provides": [
+        "struct Order { is_buy: bool, limit: u256, quantity: u256, owner: u256, owner_seq: u256 }",
+        "struct Clearing { traded: bool, price: u256, volume: u256, demand: u256, supply: u256 }",
+        "cost_ceil(quantity: u256, price: u256) -> Wei",
+        "proceeds_floor(quantity: u256, price: u256) -> Wei",
+        "const UNIT: u256 = 10^18, const MAX_QUANTITY: u256 = 10^30",
+        "contract TestToken + msg TokenMsg (decimals, totalSupply, balanceOf, allowance, transfer, approve, transferFrom, mint)"
+      ],
+      "requires": [],
+      "gate": {
+        "run": "fe fmt --check ingots/clearing && fe fmt --check ingots/exchange && fe test && fe build",
+        "expect": "test result: ok. 3 passed; 0 failed"
+      },
+      "commit": "chore(core): walking skeleton on fe 26.6.0 (workspace, starter files, money, token)",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:2",
+      "subsystem": "core",
+      "title": "Gas spike: measure clearing on capped Anvil and set the order cap",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:1"
+      ],
+      "effort": "medium",
+      "files": {
+        "create": [
+          "spikes/gas/fe.toml",
+          "spikes/gas/src/lib.fe",
+          "scripts/gas-spike.sh",
+          "deploy/params.json",
+          "docs/gas/spike.md"
+        ],
+        "modify": [],
+        "test": []
+      },
+      "provides": [
+        "deploy/params.json { maxOrders, demoBatchSize, batchSeconds, minQuantity, maxPrice }",
+        "docs/gas/spike.md"
+      ],
+      "requires": [],
+      "gate": {
+        "run": "bash scripts/gas-spike.sh",
+        "expect": "SPIKE: PASS maxOrders=100 demoBatchSize=20"
+      },
+      "commit": "feat(core): gas spike on capped Anvil sets maxOrders and demoBatchSize",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:3",
+      "subsystem": "core",
+      "title": "Price selection (select_price) and the brute-force oracle",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:1"
+      ],
+      "effort": "xhigh",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "ingots/clearing/src/select.fe",
+          "ingots/clearing/src/oracle.fe"
+        ],
+        "modify": [
+          "ingots/clearing/src/lib.fe"
+        ],
+        "test": [
+          "ingots/clearing/src/select_tests.fe"
+        ]
+      },
+      "provides": [
+        "select_price(_ orders: MemVec<Order>) -> Clearing",
+        "oracle::{demand_at, supply_at, volume_at, max_volume_between}"
+      ],
+      "requires": [
+        "struct Order { is_buy: bool, limit: u256, quantity: u256, owner: u256, owner_seq: u256 }",
+        "struct Clearing { traded: bool, price: u256, volume: u256, demand: u256, supply: u256 }"
+      ],
+      "gate": {
+        "run": "fe fmt --check ingots/clearing && fe test ingots/clearing",
+        "expect": "test result: ok. 6 passed; 0 failed"
+      },
+      "commit": "feat(core): uniform clearing price selection with order-content-only tie-breaks",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:4",
+      "subsystem": "core",
+      "title": "Rationing (allocate): only the long side at exactly the price",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:3"
+      ],
+      "effort": "xhigh",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "ingots/clearing/src/ration.fe"
+        ],
+        "modify": [
+          "ingots/clearing/src/lib.fe"
+        ],
+        "test": [
+          "ingots/clearing/src/ration_tests.fe"
+        ]
+      },
+      "provides": [
+        "allocate(_ orders: MemVec<Order>, _ clearing: Clearing) -> MemVec<u256>"
+      ],
+      "requires": [
+        "struct Order { is_buy: bool, limit: u256, quantity: u256, owner: u256, owner_seq: u256 }",
+        "struct Clearing { traded: bool, price: u256, volume: u256, demand: u256, supply: u256 }",
+        "select_price(_ orders: MemVec<Order>) -> Clearing"
+      ],
+      "gate": {
+        "run": "fe fmt --check ingots/clearing && fe test ingots/clearing",
+        "expect": "test result: ok. 11 passed; 0 failed"
+      },
+      "commit": "feat(core): pro-rata rationing at the marginal price with largest-remainder units",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:5",
+      "subsystem": "core",
+      "title": "Python exact-rational reference and generated test vectors",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:4"
+      ],
+      "effort": "xhigh",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "ref/clearing_ref.py",
+          "ingots/clearing/src/vectors.fe"
+        ],
+        "modify": [
+          ".github/workflows/ci.yml"
+        ],
+        "test": []
+      },
+      "provides": [
+        "python ref/clearing_ref.py --write | --check | --selftest",
+        "vector_* tests (17) in ingots/clearing/src/vectors.fe"
+      ],
+      "requires": [
+        "select_price(_ orders: MemVec<Order>) -> Clearing",
+        "allocate(_ orders: MemVec<Order>, _ clearing: Clearing) -> MemVec<u256>",
+        "cost_ceil(quantity: u256, price: u256) -> Wei",
+        "proceeds_floor(quantity: u256, price: u256) -> Wei"
+      ],
+      "gate": {
+        "run": "python ref/clearing_ref.py --check && python ref/clearing_ref.py --selftest && fe test ingots/clearing",
+        "expect": "test result: ok. 28 passed; 0 failed"
+      },
+      "commit": "test(core): exact-rational reference regenerates 17 clearing test vectors",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:6",
+      "subsystem": "core",
+      "title": "Seeded property suite (permutation, limits, conservation, volume-max, sandwich invariance)",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:5"
+      ],
+      "effort": "xhigh",
+      "model_tier": "top",
+      "files": {
+        "create": [],
+        "modify": [],
+        "test": [
+          "ingots/clearing/src/props.fe"
+        ]
+      },
+      "provides": [
+        "property_* (3), permutation_full_shuffle_keeps_price_and_owner_totals, sandwich_invariance_property"
+      ],
+      "requires": [
+        "select_price(_ orders: MemVec<Order>) -> Clearing",
+        "allocate(_ orders: MemVec<Order>, _ clearing: Clearing) -> MemVec<u256>",
+        "cost_ceil(quantity: u256, price: u256) -> Wei",
+        "proceeds_floor(quantity: u256, price: u256) -> Wei",
+        "oracle::{demand_at, supply_at, volume_at, max_volume_between}"
+      ],
+      "gate": {
+        "run": "fe fmt --check ingots/clearing && fe test ingots/clearing",
+        "expect": "test result: ok. 33 passed; 0 failed"
+      },
+      "commit": "test(core): seeded property suite for the clearing core",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:7",
+      "subsystem": "core",
+      "title": "Exchange interface and storage (the frozen ABI)",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:1"
+      ],
+      "effort": "medium",
+      "files": {
+        "create": [
+          "ingots/exchange/src/interface.fe",
+          "ingots/exchange/src/state.fe"
+        ],
+        "modify": [
+          "ingots/exchange/src/lib.fe"
+        ],
+        "test": []
+      },
+      "provides": [
+        "msg AnyOrderMsg + #[abi] views + events + errors (core spec section 8, ingot::interface)",
+        "struct Clock { now: Timestamp } + storage structs Settings, Book, Funds, Guard (ingot::state)"
+      ],
+      "requires": [],
+      "gate": {
+        "run": "fe fmt --check ingots/exchange && fe check ingots/exchange && echo INTERFACE: OK",
+        "expect": "INTERFACE: OK"
+      },
+      "commit": "feat(core): AnyOrder interface and storage structs",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:8",
+      "subsystem": "core",
+      "title": "Baseline constant-product pool (for the sandwich contrast only)",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:7"
+      ],
+      "effort": "medium",
+      "files": {
+        "create": [
+          "ingots/exchange/src/pool.fe"
+        ],
+        "modify": [
+          "ingots/exchange/src/lib.fe"
+        ],
+        "test": [
+          "ingots/exchange/src/pool_tests.fe"
+        ]
+      },
+      "provides": [
+        "contract ConstantProductPool(token) + msg PoolMsg (seed, buyTokens, sellTokens, reserves)"
+      ],
+      "requires": [
+        "contract TestToken + msg TokenMsg (decimals, totalSupply, balanceOf, allowance, transfer, approve, transferFrom, mint)"
+      ],
+      "gate": {
+        "run": "fe fmt --check ingots/exchange && fe test ingots/exchange",
+        "expect": "test result: ok. 4 passed; 0 failed"
+      },
+      "commit": "feat(core): constant-product baseline pool for the sandwich contrast",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:9",
+      "subsystem": "core",
+      "title": "Exchange logic, AnyOrder, the test-clock twin, proxy actors and lifecycle tests",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:8",
+        "core:4"
+      ],
+      "effort": "high",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "ingots/exchange/src/logic.fe",
+          "ingots/exchange/src/anyorder.fe",
+          "ingots/exchange/src/testclock.fe",
+          "ingots/exchange/src/actors.fe",
+          "ingots/exchange/src/harness.fe"
+        ],
+        "modify": [
+          "ingots/exchange/src/lib.fe"
+        ],
+        "test": [
+          "ingots/exchange/src/lifecycle_tests.fe"
+        ]
+      },
+      "provides": [
+        "contract AnyOrder(token, genesis, batch_length, max_orders, min_quantity, max_price)",
+        "contract AnyOrderTestClock + msg TestClockMsg::SetNow { now: Timestamp } (test only)",
+        "contract Trader + msg TraderMsg, contract Reenterer + msg ReentererMsg (test only)",
+        "harness::{T, MILLI, MAX_PRICE, deploy_token, deploy_exchange, new_trader, fund_tokens, fund_eth, place_buy, place_sell, set_time, clear, claim, balances, batch_info, order_at, token_balance}"
+      ],
+      "requires": [
+        "msg AnyOrderMsg + #[abi] views + events + errors (core spec section 8, ingot::interface)",
+        "struct Clock { now: Timestamp } + storage structs Settings, Book, Funds, Guard (ingot::state)",
+        "contract ConstantProductPool(token) + msg PoolMsg (seed, buyTokens, sellTokens, reserves)",
+        "contract TestToken + msg TokenMsg (decimals, totalSupply, balanceOf, allowance, transfer, approve, transferFrom, mint)",
+        "select_price(_ orders: MemVec<Order>) -> Clearing",
+        "allocate(_ orders: MemVec<Order>, _ clearing: Clearing) -> MemVec<u256>",
+        "cost_ceil(quantity: u256, price: u256) -> Wei",
+        "proceeds_floor(quantity: u256, price: u256) -> Wei"
+      ],
+      "gate": {
+        "run": "fe fmt --check ingots/exchange && fe test ingots/exchange",
+        "expect": "test result: ok. 17 passed; 0 failed"
+      },
+      "commit": "feat(core): AnyOrder exchange with effect-scoped handlers and lifecycle tests",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:10",
+      "subsystem": "core",
+      "title": "Freeze the ABI of the deployed contracts",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:9",
+        "core:5"
+      ],
+      "effort": "low",
+      "model_tier": "fast",
+      "files": {
+        "create": [
+          "abi/AnyOrder.abi.json",
+          "abi/TestToken.abi.json",
+          "abi/ConstantProductPool.abi.json",
+          "scripts/check-abi.sh"
+        ],
+        "modify": [
+          ".github/workflows/ci.yml"
+        ],
+        "test": []
+      },
+      "provides": [
+        "abi/AnyOrder.abi.json, abi/TestToken.abi.json, abi/ConstantProductPool.abi.json (frozen) + bash scripts/check-abi.sh"
+      ],
+      "requires": [
+        "contract AnyOrder(token, genesis, batch_length, max_orders, min_quantity, max_price)",
+        "contract TestToken + msg TokenMsg (decimals, totalSupply, balanceOf, allowance, transfer, approve, transferFrom, mint)",
+        "contract ConstantProductPool(token) + msg PoolMsg (seed, buyTokens, sellTokens, reserves)"
+      ],
+      "gate": {
+        "run": "bash scripts/check-abi.sh",
+        "expect": "ABI: OK"
+      },
+      "commit": "chore(core): freeze the ABI of AnyOrder, TestToken and the baseline pool",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:11",
+      "subsystem": "core",
+      "title": "Contract invariants: interleaving permutations, solvency, reentrancy",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:10"
+      ],
+      "effort": "xhigh",
+      "model_tier": "top",
+      "files": {
+        "create": [],
+        "modify": [],
+        "test": [
+          "ingots/exchange/src/invariant_tests.fe"
+        ]
+      },
+      "provides": [
+        "permutation_contract_interleavings_seed_7, permutation_contract_interleavings_seed_8, solvency_holds_after_every_step_of_a_seeded_run, reentrancy_lock_refuses_a_second_withdraw"
+      ],
+      "requires": [
+        "harness::{T, MILLI, MAX_PRICE, deploy_token, deploy_exchange, new_trader, fund_tokens, fund_eth, place_buy, place_sell, set_time, clear, claim, balances, batch_info, order_at, token_balance}",
+        "contract AnyOrderTestClock + msg TestClockMsg::SetNow { now: Timestamp } (test only)",
+        "contract Trader + msg TraderMsg, contract Reenterer + msg ReentererMsg (test only)",
+        "cost_ceil(quantity: u256, price: u256) -> Wei",
+        "proceeds_floor(quantity: u256, price: u256) -> Wei"
+      ],
+      "gate": {
+        "run": "fe fmt --check ingots/exchange && fe test ingots/exchange",
+        "expect": "test result: ok. 21 passed; 0 failed"
+      },
+      "commit": "test(core): arrival-order, solvency and reentrancy invariants at contract level",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "core:12",
+      "subsystem": "core",
+      "title": "The sandwich contrast (the money shot)",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:11",
+        "core:6"
+      ],
+      "effort": "high",
+      "model_tier": "top",
+      "files": {
+        "create": [],
+        "modify": [],
+        "test": [
+          "ingots/exchange/src/sandwich_tests.fe"
+        ]
+      },
+      "provides": [
+        "sandwich_cpmm_attacker_profits, sandwich_batch_attacker_nets_dust, sandwich_one_sided_moves_price"
+      ],
+      "requires": [
+        "harness::{T, MILLI, MAX_PRICE, deploy_token, deploy_exchange, new_trader, fund_tokens, fund_eth, place_buy, place_sell, set_time, clear, claim, balances, batch_info, order_at, token_balance}",
+        "contract ConstantProductPool(token) + msg PoolMsg (seed, buyTokens, sellTokens, reserves)",
+        "contract Trader + msg TraderMsg, contract Reenterer + msg ReentererMsg (test only)",
+        "contract TestToken + msg TokenMsg (decimals, totalSupply, balanceOf, allowance, transfer, approve, transferFrom, mint)"
+      ],
+      "gate": {
+        "run": "fe fmt --check ingots/exchange && fe test --filter sandwich",
+        "expect": "test result: ok. 6 passed; 0 failed"
+      },
+      "commit": "test(core): sandwich contrast, pool vs batch, with exact asserted numbers",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:1",
+      "subsystem": "dapp",
+      "title": "Web scaffold: pinned toolchain, two-page Vite build, formatters that never show unknown as zero",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [],
+      "effort": "medium",
+      "files": {
+        "create": [
+          "web/package.json",
+          "web/pnpm-lock.yaml",
+          "web/tsconfig.json",
+          "web/vite.config.ts",
+          "web/index.html",
+          "web/app/index.html",
+          "web/src/lib/format.ts"
+        ],
+        "modify": [],
+        "test": [
+          "web/src/lib/format.test.ts"
+        ]
+      },
+      "provides": [
+        "formatEth, formatTokens, formatPrice, formatWei, formatUnits18, formatAge, formatCountdown, shortAddress, UNKNOWN (web/src/lib/format.ts)"
+      ],
+      "requires": [],
+      "gate": {
+        "run": "NO_COLOR=1 pnpm -C web test && pnpm -C web build",
+        "expect": "6 passed (6)"
+      },
+      "commit": "chore(dapp): web scaffold with pinned toolchain and two-page build",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:2",
+      "subsystem": "dapp",
+      "title": "Deployment file schema, chain state machine, supply/demand curve points, recorded-run tokens",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:1"
+      ],
+      "effort": "medium",
+      "files": {
+        "create": [
+          "web/src/chain/deployment.ts",
+          "web/src/chain/state.ts",
+          "web/src/lib/curves.ts",
+          "web/src/lib/recorded.ts"
+        ],
+        "modify": [],
+        "test": [
+          "web/src/chain/deployment.test.ts",
+          "web/src/chain/state.test.ts",
+          "web/src/lib/curves.test.ts",
+          "web/src/lib/recorded.test.ts"
+        ]
+      },
+      "provides": [
+        "parseDeployment(input: unknown): Deployment, loadDeployment(url?, fetcher?), type Deployment, TRADER_LABELS, LOCAL_CHAIN_ID (web/src/chain/deployment.ts)",
+        "classify, isStale, batchPhase, secondsLeft, RECOVERY, POLL_MS, type ChainState (web/src/chain/state.ts)",
+        "curvePoints(orders: readonly BookOrder[]): CurvePoint[] (web/src/lib/curves.ts)",
+        "recordedTokens(rec: Recording), injectRecorded(html, tokens) (web/src/lib/recorded.ts)"
+      ],
+      "requires": [
+        "formatEth, formatTokens, formatPrice, formatWei, formatUnits18, formatAge, formatCountdown, shortAddress, UNKNOWN (web/src/lib/format.ts)"
+      ],
+      "gate": {
+        "run": "NO_COLOR=1 pnpm -C web test",
+        "expect": "23 passed (23)"
+      },
+      "commit": "feat(dapp): deployment schema, chain states, curve points, recorded tokens",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:3",
+      "subsystem": "dapp",
+      "title": "Chain tooling: ABI module, viem clients, Anvil, deploy + seed, the one-command local run",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:2",
+        "core:10",
+        "core:2"
+      ],
+      "effort": "high",
+      "files": {
+        "create": [
+          "web/scripts/gen-abi.ts",
+          "web/src/chain/abi.ts",
+          "web/src/chain/client.ts",
+          "web/scripts/lib/proc.ts",
+          "web/scripts/lib/anvil.ts",
+          "web/scripts/lib/repo.ts",
+          "web/scripts/lib/deploy.ts",
+          "web/scripts/deploy-local.ts",
+          "web/scripts/local.ts"
+        ],
+        "modify": [
+          ".github/workflows/ci.yml"
+        ],
+        "test": [
+          "web/test/e2e/tooling.e2e.test.ts",
+          "web/test/e2e/lifecycle.e2e.test.ts"
+        ]
+      },
+      "provides": [
+        "clientsFor(rpcUrl), send(clients, request), CLEAR_GAS_LIMIT (web/src/chain/client.ts)",
+        "anyOrderAbi, testTokenAbi, poolAbi (web/src/chain/abi.ts, generated from abi/)",
+        "deployAll, fundTraders, seedDemo, demoOrder, advanceTo (web/scripts/lib/deploy.ts), startAnvil, rpcReady (web/scripts/lib/anvil.ts), deployLocal(rpcUrl?, outFile?, batchSeconds?) (web/scripts/deploy-local.ts)",
+        "pnpm -C web local (Anvil 8545 + fe build + deploy + seed + Vite)"
+      ],
+      "requires": [
+        "parseDeployment(input: unknown): Deployment, loadDeployment(url?, fetcher?), type Deployment, TRADER_LABELS, LOCAL_CHAIN_ID (web/src/chain/deployment.ts)",
+        "abi/AnyOrder.abi.json, abi/TestToken.abi.json, abi/ConstantProductPool.abi.json (frozen) + bash scripts/check-abi.sh",
+        "deploy/params.json { maxOrders, demoBatchSize, batchSeconds, minQuantity, maxPrice }"
+      ],
+      "gate": {
+        "run": "pnpm -C web gen:abi --check && pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web exec vitest run test/e2e/tooling.e2e.test.ts test/e2e/lifecycle.e2e.test.ts --no-file-parallelism",
+        "expect": "4 passed (4)"
+      },
+      "commit": "feat(dapp): local Anvil tooling, deploy allowlist and one-command run",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:4",
+      "subsystem": "dapp",
+      "title": "The sandwich scenario on the deployed contracts, its recording, and the live-data hooks",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:3"
+      ],
+      "effort": "high",
+      "files": {
+        "create": [
+          "web/src/scenario/sandwich.ts",
+          "web/scripts/scenario.ts",
+          "web/public/recorded/sandwich.json",
+          "web/src/app/live.ts"
+        ],
+        "modify": [],
+        "test": [
+          "web/test/e2e/scenario.e2e.test.ts"
+        ]
+      },
+      "provides": [
+        "runSandwich(clients, deployment): Promise<SandwichResult> (web/src/scenario/sandwich.ts), recordScenario(deployment, outFile?) (web/scripts/scenario.ts)",
+        "web/public/recorded/sandwich.json (a real recorded run)",
+        "useDeployment, useClients, useChain, useBlockRead, readBatch, type OrderRow, type BatchSnapshot (web/src/app/live.ts)"
+      ],
+      "requires": [
+        "clientsFor(rpcUrl), send(clients, request), CLEAR_GAS_LIMIT (web/src/chain/client.ts)",
+        "anyOrderAbi, testTokenAbi, poolAbi (web/src/chain/abi.ts, generated from abi/)",
+        "deployAll, fundTraders, seedDemo, demoOrder, advanceTo (web/scripts/lib/deploy.ts), startAnvil, rpcReady (web/scripts/lib/anvil.ts), deployLocal(rpcUrl?, outFile?, batchSeconds?) (web/scripts/deploy-local.ts)",
+        "parseDeployment(input: unknown): Deployment, loadDeployment(url?, fetcher?), type Deployment, TRADER_LABELS, LOCAL_CHAIN_ID (web/src/chain/deployment.ts)",
+        "classify, isStale, batchPhase, secondsLeft, RECOVERY, POLL_MS, type ChainState (web/src/chain/state.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web exec vitest run test/e2e/scenario.e2e.test.ts",
+        "expect": "1 passed (1)"
+      },
+      "commit": "feat(dapp): sandwich scenario on the real contracts, recorded from Anvil",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:5",
+      "subsystem": "dapp",
+      "title": "UI: the /app page shell and the live batch hero (first gate run of /app)",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:4"
+      ],
+      "effort": "high",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "web/scripts/ui-gate.ts",
+          "web/src/app/main.tsx",
+          "web/src/app/shared.tsx",
+          "web/src/app/BatchHero.tsx",
+          "web/src/app/islands.tsx",
+          "web/public/assets/THIRD-PARTY-NOTICE.md",
+          "web/public/assets/system.css",
+          "web/public/assets/system.js",
+          "web/public/assets/ui/cards.css",
+          "web/public/assets/ui/base.css",
+          "web/public/assets/ui/ui.js",
+          "web/public/assets/motion/motion.css",
+          "web/public/assets/motion/motion.js",
+          "web/public/assets/backgrounds/backgrounds.css",
+          "web/public/assets/backgrounds/backgrounds.js",
+          "web/public/assets/layout/layout.css",
+          "web/public/assets/layout/layout.js",
+          "web/public/assets/icons/icon.css",
+          "web/public/assets/effects/fx.js",
+          "web/public/assets/effects/grain-gradient/effect.js",
+          "web/public/assets/moments/moments.js",
+          "web/public/assets/moments/lib.js",
+          "web/public/assets/moments/pinned-chapters/moment.css",
+          "web/public/assets/moments/pinned-chapters/moment.js"
+        ],
+        "modify": [
+          "web/vite.config.ts",
+          "web/app/index.html"
+        ],
+        "test": []
+      },
+      "provides": [
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)",
+        "useLive, ChainNotice, selectTrader, useSelectedTrader, errorName, TRADER_NOTE (web/src/app/shared.tsx); island registry islands (web/src/app/islands.tsx)",
+        "web/app/index.html: the /app page with sections #batch, #trade, #book, #settle, #sandwich and [data-island] mount points"
+      ],
+      "requires": [
+        "useDeployment, useClients, useChain, useBlockRead, readBatch, type OrderRow, type BatchSnapshot (web/src/app/live.ts)",
+        "deployAll, fundTraders, seedDemo, demoOrder, advanceTo (web/scripts/lib/deploy.ts), startAnvil, rpcReady (web/scripts/lib/anvil.ts), deployLocal(rpcUrl?, outFile?, batchSeconds?) (web/scripts/deploy-local.ts)",
+        "classify, isStale, batchPhase, secondsLeft, RECOVERY, POLL_MS, type ChainState (web/src/chain/state.ts)",
+        "curvePoints(orders: readonly BookOrder[]): CurvePoint[] (web/src/lib/curves.ts)",
+        "formatEth, formatTokens, formatPrice, formatWei, formatUnits18, formatAge, formatCountdown, shortAddress, UNKNOWN (web/src/lib/format.ts)",
+        "recordedTokens(rec: Recording), injectRecorded(html, tokens) (web/src/lib/recorded.ts)",
+        "web/public/recorded/sandwich.json (a real recorded run)",
+        "parseDeployment(input: unknown): Deployment, loadDeployment(url?, fetcher?), type Deployment, TRADER_LABELS, LOCAL_CHAIN_ID (web/src/chain/deployment.ts)",
+        "clientsFor(rpcUrl), send(clients, request), CLEAR_GAS_LIMIT (web/src/chain/client.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web ui-gate app",
+        "expect": "GATE: PASS"
+      },
+      "commit": "feat(dapp): /app page shell with the live batch hero",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:6",
+      "subsystem": "dapp",
+      "title": "UI: the #trade island (built-in traders, balances, deposits, the order ticket)",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:5"
+      ],
+      "effort": "high",
+      "files": {
+        "create": [
+          "web/src/app/TradePanel.tsx"
+        ],
+        "modify": [
+          "web/src/app/islands.tsx",
+          "web/app/index.html"
+        ],
+        "test": []
+      },
+      "provides": [],
+      "requires": [
+        "useLive, ChainNotice, selectTrader, useSelectedTrader, errorName, TRADER_NOTE (web/src/app/shared.tsx); island registry islands (web/src/app/islands.tsx)",
+        "useDeployment, useClients, useChain, useBlockRead, readBatch, type OrderRow, type BatchSnapshot (web/src/app/live.ts)",
+        "clientsFor(rpcUrl), send(clients, request), CLEAR_GAS_LIMIT (web/src/chain/client.ts)",
+        "anyOrderAbi, testTokenAbi, poolAbi (web/src/chain/abi.ts, generated from abi/)",
+        "formatEth, formatTokens, formatPrice, formatWei, formatUnits18, formatAge, formatCountdown, shortAddress, UNKNOWN (web/src/lib/format.ts)",
+        "web/app/index.html: the /app page with sections #batch, #trade, #book, #settle, #sandwich and [data-island] mount points",
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web ui-gate app",
+        "expect": "GATE: PASS"
+      },
+      "commit": "feat(dapp): trade island with built-in Anvil traders",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:7",
+      "subsystem": "dapp",
+      "title": "UI: the #book and #settle islands (the book, clearing, claims)",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:6"
+      ],
+      "effort": "high",
+      "files": {
+        "create": [
+          "web/src/app/BookAndSettle.tsx"
+        ],
+        "modify": [
+          "web/src/app/islands.tsx",
+          "web/app/index.html"
+        ],
+        "test": []
+      },
+      "provides": [],
+      "requires": [
+        "useLive, ChainNotice, selectTrader, useSelectedTrader, errorName, TRADER_NOTE (web/src/app/shared.tsx); island registry islands (web/src/app/islands.tsx)",
+        "useDeployment, useClients, useChain, useBlockRead, readBatch, type OrderRow, type BatchSnapshot (web/src/app/live.ts)",
+        "clientsFor(rpcUrl), send(clients, request), CLEAR_GAS_LIMIT (web/src/chain/client.ts)",
+        "anyOrderAbi, testTokenAbi, poolAbi (web/src/chain/abi.ts, generated from abi/)",
+        "formatEth, formatTokens, formatPrice, formatWei, formatUnits18, formatAge, formatCountdown, shortAddress, UNKNOWN (web/src/lib/format.ts)",
+        "classify, isStale, batchPhase, secondsLeft, RECOVERY, POLL_MS, type ChainState (web/src/chain/state.ts)",
+        "web/app/index.html: the /app page with sections #batch, #trade, #book, #settle, #sandwich and [data-island] mount points",
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web ui-gate app",
+        "expect": "GATE: PASS"
+      },
+      "commit": "feat(dapp): order book, clearing and claim islands",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:8",
+      "subsystem": "dapp",
+      "title": "UI: the #sandwich island (recorded vs live run, where the guarantee stops)",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:7"
+      ],
+      "effort": "high",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "web/src/app/SandwichRunner.tsx"
+        ],
+        "modify": [
+          "web/src/app/islands.tsx",
+          "web/app/index.html"
+        ],
+        "test": []
+      },
+      "provides": [],
+      "requires": [
+        "useLive, ChainNotice, selectTrader, useSelectedTrader, errorName, TRADER_NOTE (web/src/app/shared.tsx); island registry islands (web/src/app/islands.tsx)",
+        "runSandwich(clients, deployment): Promise<SandwichResult> (web/src/scenario/sandwich.ts), recordScenario(deployment, outFile?) (web/scripts/scenario.ts)",
+        "web/public/recorded/sandwich.json (a real recorded run)",
+        "formatEth, formatTokens, formatPrice, formatWei, formatUnits18, formatAge, formatCountdown, shortAddress, UNKNOWN (web/src/lib/format.ts)",
+        "web/app/index.html: the /app page with sections #batch, #trade, #book, #settle, #sandwich and [data-island] mount points",
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web ui-gate app",
+        "expect": "GATE: PASS"
+      },
+      "commit": "feat(dapp): sandwich contrast island with live run and its limits",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:9",
+      "subsystem": "dapp",
+      "title": "UI: the landing page at / (second gate run: its own build)",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:8"
+      ],
+      "effort": "high",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "web/public/assets/effects/gradient-mesh/effect.js",
+          "web/public/assets/moments/word-highlight/moment.css",
+          "web/public/assets/moments/word-highlight/moment.js"
+        ],
+        "modify": [
+          "web/index.html"
+        ],
+        "test": []
+      },
+      "provides": [],
+      "requires": [
+        "web/public/recorded/sandwich.json (a real recorded run)",
+        "recordedTokens(rec: Recording), injectRecorded(html, tokens) (web/src/lib/recorded.ts)",
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)",
+        "web/app/index.html: the /app page with sections #batch, #trade, #book, #settle, #sandwich and [data-island] mount points"
+      ],
+      "gate": {
+        "run": "pnpm -C web ui-gate landing",
+        "expect": "GATE: PASS"
+      },
+      "commit": "feat(dapp): landing page built from the recorded run",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:10",
+      "subsystem": "dapp",
+      "title": "UI polish (cut first): optional injected-wallet mode",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:9"
+      ],
+      "effort": "medium",
+      "files": {
+        "create": [
+          "web/src/app/WalletPanel.tsx"
+        ],
+        "modify": [
+          "web/src/app/islands.tsx",
+          "web/app/index.html"
+        ],
+        "test": []
+      },
+      "provides": [],
+      "requires": [
+        "useLive, ChainNotice, selectTrader, useSelectedTrader, errorName, TRADER_NOTE (web/src/app/shared.tsx); island registry islands (web/src/app/islands.tsx)",
+        "useDeployment, useClients, useChain, useBlockRead, readBatch, type OrderRow, type BatchSnapshot (web/src/app/live.ts)",
+        "anyOrderAbi, testTokenAbi, poolAbi (web/src/chain/abi.ts, generated from abi/)",
+        "web/app/index.html: the /app page with sections #batch, #trade, #book, #settle, #sandwich and [data-island] mount points",
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)",
+        "formatEth, formatTokens, formatPrice, formatWei, formatUnits18, formatAge, formatCountdown, shortAddress, UNKNOWN (web/src/lib/format.ts)",
+        "parseDeployment(input: unknown): Deployment, loadDeployment(url?, fetcher?), type Deployment, TRADER_LABELS, LOCAL_CHAIN_ID (web/src/chain/deployment.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web ui-gate app",
+        "expect": "GATE: PASS"
+      },
+      "commit": "feat(dapp): optional injected-wallet mode on the local chain",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "docs:1",
+      "subsystem": "docs",
+      "title": "README.md: R2-contract-protocol v1 with the event overlay",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-docs.md",
+      "depends_on": [
+        "core:12",
+        "dapp:9"
+      ],
+      "effort": "medium",
+      "files": {
+        "create": [],
+        "modify": [
+          "README.md"
+        ],
+        "test": []
+      },
+      "provides": [
+        "README.md (R2-contract-protocol v1 + event-overlay)"
+      ],
+      "requires": [
+        "web/public/recorded/sandwich.json (a real recorded run)",
+        "pnpm -C web local (Anvil 8545 + fe build + deploy + seed + Vite)",
+        "deploy/params.json { maxOrders, demoBatchSize, batchSeconds, minQuantity, maxPrice }"
+      ],
+      "gate": {
+        "run": "$want = @('# AnyOrder','## Demo','## What it does','## Quickstart','## Built at Fe Builders Challenge 2026','## Contract addresses','## How it works','## Security notes','## Build & test','## Deploy','## The problem','## Approach','## Fe highlight','## Architecture','## Limitations','## Declaration','## Team','## Roadmap','## License'); $lines = Get-Content README.md -Encoding UTF8; $inFence = $false; $got = foreach ($l in $lines) { if ($l -match '^\\x60{3}') { $inFence = -not $inFence } elseif (-not $inFence -and $l -cmatch '^#{1,2} ') { $l } }; $ok = ($got.Count -eq $want.Count); if ($ok) { for ($i = 0; $i -lt $want.Count; $i++) { if ($got[$i] -cne $want[$i]) { $ok = $false } } }; if ($ok -and ($lines[0] -ceq '<!-- readme-schema: R2-contract-protocol v1 + event-overlay -->')) { 'PASS' } else { 'FAIL' }",
+        "expect": "PASS"
+      },
+      "commit": "docs: README per R2-contract-protocol v1 with the contest overlay",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "docs:2",
+      "subsystem": "docs",
+      "title": "SUBMISSION.md: the starter's template, filled",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-docs.md",
+      "depends_on": [
+        "docs:1"
+      ],
+      "effort": "medium",
+      "files": {
+        "create": [],
+        "modify": [
+          "SUBMISSION.md"
+        ],
+        "test": []
+      },
+      "provides": [],
+      "requires": [
+        "README.md (R2-contract-protocol v1 + event-overlay)"
+      ],
+      "gate": {
+        "run": "$want = @('# AnyOrder','## The problem','## Approach','## Fe highlight','## Architecture','## Build and test','## Demo','## Limitations','## Declaration','## Team','## License'); $lines = Get-Content SUBMISSION.md -Encoding UTF8; $inFence = $false; $got = foreach ($l in $lines) { if ($l -match '^\\x60{3}') { $inFence = -not $inFence } elseif (-not $inFence -and $l -cmatch '^#{1,2} ') { $l } }; $ok = ($got.Count -eq $want.Count); if ($ok) { for ($i = 0; $i -lt $want.Count; $i++) { if ($got[$i] -cne $want[$i]) { $ok = $false } } }; if ($ok -and (($lines -cmatch '^\\*\\*Pitch:\\*\\* ').Count -eq 1)) { 'PASS' } else { 'FAIL' }",
+        "expect": "PASS"
+      },
+      "commit": "docs: SUBMISSION.md for the jury",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "stretch:1",
+      "subsystem": "stretch",
+      "title": "S1 (cut first): gas table of the real contract",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-stretch.md",
+      "depends_on": [
+        "dapp:3",
+        "docs:1"
+      ],
+      "effort": "medium",
+      "files": {
+        "create": [
+          "web/scripts/gas-table.ts",
+          "docs/gas.md"
+        ],
+        "modify": [
+          "README.md"
+        ],
+        "test": []
+      },
+      "provides": [],
+      "requires": [
+        "deployAll, fundTraders, seedDemo, demoOrder, advanceTo (web/scripts/lib/deploy.ts), startAnvil, rpcReady (web/scripts/lib/anvil.ts), deployLocal(rpcUrl?, outFile?, batchSeconds?) (web/scripts/deploy-local.ts)",
+        "clientsFor(rpcUrl), send(clients, request), CLEAR_GAS_LIMIT (web/src/chain/client.ts)",
+        "deploy/params.json { maxOrders, demoBatchSize, batchSeconds, minQuantity, maxPrice }",
+        "README.md (R2-contract-protocol v1 + event-overlay)"
+      ],
+      "gate": {
+        "run": "pnpm -C web exec tsx scripts/gas-table.ts",
+        "expect": "GAS: OK"
+      },
+      "commit": "docs(stretch): gas table of clear() for the real contract",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "stretch:2",
+      "subsystem": "stretch",
+      "title": "S2 (cut second): native Linux CI for the pure clearing ingot",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-stretch.md",
+      "depends_on": [
+        "core:6"
+      ],
+      "effort": "low",
+      "files": {
+        "create": [
+          ".github/workflows/native.yml"
+        ],
+        "modify": [],
+        "test": []
+      },
+      "provides": [],
+      "requires": [],
+      "gate": {
+        "run": "fe check ingots/clearing --backend native && echo NATIVE-CHECK: OK",
+        "expect": "NATIVE-CHECK: OK"
+      },
+      "commit": "ci(stretch): check and test the clearing ingot on the native backend",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    }
+  ]
+}
