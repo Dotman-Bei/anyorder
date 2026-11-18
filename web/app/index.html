@@ -91,10 +91,8 @@
 .ao-rows .ao-v.is-mark { color: var(--u-accent); }
 .ao-cols { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 4px 24px; }
 .ao-foot { margin: 0; padding: 12px 16px 16px; border-top: 1px solid var(--u-line); color: var(--u-ink); }
-/* the frames' heights */
-#settle .frame { --ratio: 80%; }
-#book .frame { --ratio: 30%; }
-@media (max-width: 639px) { #settle .frame { --ratio: 100%; } #book .frame { --ratio: 96%; } .ao-cols { grid-template-columns: minmax(0, 1fr); } }
+/* the frames' heights: #book and #settle hold their island in flow (see their block below), #trade too */
+@media (max-width: 639px) { .ao-cols { grid-template-columns: minmax(0, 1fr); } }
 /* #trade: the island is a form on the system's recipe (labels above, 44px controls, one button pair) in the dark UI panel;
    the panel carries the page's dark tokens, so .field, .btn and the notice read on it */
 #trade .frame { --ratio: 0px; padding: var(--s-4); }
@@ -134,6 +132,64 @@
 }
 @media (min-width: 1024px) and (max-width: 1279px) { #trade { --h: 2; } }
 @media (max-width: 639px) { #trade { --hm: 2; } }
+/* #book and #settle: the island is a table in the dark UI panel, in flow; the table scrolls inside its own frame, never a second screen */
+:is(#book, #settle) .frame { --ratio: 0px; padding: var(--s-5); align-items: flex-start; }
+#book .frame { min-height: 496px; }
+#settle .frame { min-height: 596px; }
+:is(#book, #settle) .ui-panel { width: 100%; container-type: inline-size; color-scheme: dark;
+  --bg: var(--p-surface); --surface: var(--p-bg); --ink: var(--p-ink); --muted: var(--p-muted);
+  --line: color-mix(in oklab, var(--p-ink) 12%, transparent); --line-strong: color-mix(in oklab, var(--p-ink) 30%, transparent);
+  --action: var(--p-action); --action-ink: var(--p-action-ink); --error: color-mix(in oklab, #d92d20 72%, var(--p-ink)); }
+#book .ui-panel { max-width: 880px; }
+#settle .ui-panel { max-width: 580px; }
+:is(#book, #settle) .ui-panel > .chain-notice, :is(#book, #settle) .ui-panel > .batch-empty { padding: var(--s-4); }
+:is(#book, #settle) .chain-notice .btn { background: color-mix(in oklab, var(--p-ink) 8%, var(--p-surface)); color: var(--p-ink); justify-self: start; }
+.ui .batch-empty { margin: 0; color: var(--u-muted); font: 400 14px/20px var(--font-text); }
+.ui .note { margin: 0; color: var(--u-muted); font: 400 14px/20px var(--font-text); }
+.toggle { display: flex; align-items: center; gap: var(--s-3); min-height: 44px; padding: 0 var(--s-4); color: var(--u-ink); font: 400 14px/20px var(--font-text); cursor: pointer; }
+.table-scroll { max-height: var(--tbl-h, 300px); overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--u-line); }
+.orders { width: 100%; border-collapse: collapse; font: 400 14px/20px var(--font-text); font-variant-numeric: tabular-nums; }
+.orders th, .orders td { padding: 12px 8px; text-align: left; vertical-align: middle; border-top: 1px solid var(--u-line); }
+.orders :is(th, td):first-child { padding-left: var(--s-4); }
+.orders :is(th, td):last-child { padding-right: var(--s-4); }
+.orders thead th { position: sticky; top: 0; z-index: 1; border-top: 0; background: var(--u-bg); color: var(--u-muted); font-size: 13px; font-weight: 500; box-shadow: inset 0 -1px 0 var(--u-line); }
+.orders tbody tr:first-child td { border-top: 0; }
+.orders .num { text-align: right; white-space: nowrap; }
+.orders .act { padding-block: 0; }
+.settle .btn, .book .btn { padding-inline: var(--s-3); }
+.settle .btn { height: auto; min-height: 44px; padding-block: var(--s-3); white-space: normal; line-height: 1.25; }
+.settle .orders .btn { white-space: nowrap; }
+@media (min-width: 640px) { .settle .orders .btn { min-height: 36px; padding-block: 0; font-size: var(--t-small); } }
+.settle__bar { display: flex; flex-wrap: wrap; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--u-line); }
+.cleared__result { margin: 0; padding: var(--s-3) var(--s-4); color: var(--u-ink); font: 400 14px/20px var(--font-text); }
+.settle .ao-foot, .book .ao-foot { display: grid; gap: var(--s-1); }
+.ao-foot > p { margin: 0; }
+.settle .tx-status:empty { display: none; }
+.settle .tx-status { color: var(--u-ink); }
+#settle .table-scroll { --tbl-h: 296px; }
+#book .table-scroll { --tbl-h: 308px; }
+@media (max-width: 639px) {
+  #book, #settle { --hm: 2; }
+  #book .frame, #settle .frame { padding: var(--s-4); }
+  #book .frame { min-height: 1187px; }
+  #settle .frame { min-height: 1165px; margin-top: var(--s-4); }
+  #book .table-scroll { --tbl-h: 995px; }
+  #settle .table-scroll { --tbl-h: 776px; }
+  .orders thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .orders, .orders tbody { display: block; }
+  .orders tr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: var(--s-3) var(--s-4); border-top: 1px solid var(--u-line); }
+  .orders tbody tr:first-child { border-top: 0; }
+  .orders td, .orders td:first-child, .orders td:last-child { display: block; padding: 0; border: 0; }
+  .orders .num { text-align: left; }
+  .book .idx::before { content: "#"; }
+  .book .lim { grid-column: 1 / 3; }
+  .book .qty { grid-column: 3; text-align: right; }
+  .fills tr { grid-template-columns: minmax(0, 1fr) auto; }
+  .fills td[data-label] { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: var(--s-3); }
+  .fills td[data-label]::before { content: attr(data-label); color: var(--u-muted); }
+  .fills .act { grid-column: 1 / -1; margin-top: var(--s-2); }
+  .fills .act .btn { width: 100%; }
+}
 /* the sandwich steps' panels, compact enough for the moment's 4:3 visual at every width */
 .mo-pc__visual .ui { width: min(100%, 440px); }
 .guarantee { display: grid; gap: var(--s-2); padding-top: var(--s-5); border-top: 1px solid var(--line); max-width: 52ch; }
@@ -256,17 +312,14 @@
         <p class="span-6 start-7">Clearing sorts by limit price and never reads arrival order. It has no Ctx or caller effect; the only identity it reads is each order's recorded owner, for the final tie-breaks, at most 1 base unit per order.</p>
       </div>
       <div class="frame frame--lit" style="margin-top: var(--s-7)">
-        <div class="stage">
-          <div class="at-rise fit" style="--fit-max: 760px; --ax: max(24px, 50% - 380px); --ay: 40px">
-            <div class="ui ui-panel" data-island="book">
-              <div class="ui-head"><span class="ui-title">How clearing reads the book</span><span class="ui-spacer"></span><span class="ui-meta">orderAt()</span></div>
-              <ul class="ao-rows">
-                <li class="ao-cols"><span>Sorted by</span><span class="ao-v">limit price, best first</span></li>
-                <li class="ao-cols"><span>Never read</span><span class="ao-v">arrival order</span></li>
-                <li class="ao-cols"><span>Final tie-break</span><span class="ao-v is-mark">owner, then owner's sequence</span></li>
-              </ul>
-            </div>
-          </div>
+        <div class="ui ui-panel" data-island="book">
+          <div class="ui-head"><span class="ui-title">How clearing reads the book</span><span class="ui-spacer"></span><span class="ui-meta">orderAt()</span></div>
+          <ul class="ao-rows">
+            <li class="ao-cols"><span>Sorted by</span><span class="ao-v">limit price, best first</span></li>
+            <li class="ao-cols"><span>Never read</span><span class="ao-v">arrival order</span></li>
+            <li class="ao-cols"><span>Final tie-break</span><span class="ao-v is-mark">owner, then owner's sequence</span></li>
+          </ul>
+          <p class="ao-foot">Anvil dev accounts. Test funds, no real value.</p>
         </div>
       </div>
     </div>
@@ -280,19 +333,15 @@
         <p>Rounding dust is at most 1 wei per order, and the contract keeps it.</p>
       </div>
       <div class="frame frame--lit frame--split span-6 start-7">
-        <div class="stage stage--fade-b">
-          <div class="at-rise fit" style="--fit-max: 560px; --ax: max(24px, 50% - 280px); --ay: 40px">
-            <div class="ui ui-panel" data-island="settle">
-              <div class="ui-head"><span class="ui-title">Cleared batch</span><span class="ui-spacer"></span><span class="ui-meta">recorded</span></div>
-              <ul class="ao-rows">
-                <li><span>Clearing price</span><span class="ao-v is-mark">{{rec:batch.price}}</span></li>
-                <li><span>Buy filled</span><span class="ao-v">{{rec:batch.victimTokens}}</span></li>
-                <li><span>Paid</span><span class="ao-v">{{rec:batch.victimPaid}}</span></li>
-                <li><span>Dust kept</span><span class="ao-v">at most 1 wei per order</span></li>
-              </ul>
-              <p class="ao-foot">Recorded on a local Anvil chain, {{rec:recordedAt}}, commit {{rec:commit}}</p>
-            </div>
-          </div>
+        <div class="ui ui-panel" data-island="settle">
+          <div class="ui-head"><span class="ui-title">Cleared batch</span><span class="ui-spacer"></span><span class="ui-meta">recorded</span></div>
+          <ul class="ao-rows">
+            <li><span>Clearing price</span><span class="ao-v is-mark">{{rec:batch.price}}</span></li>
+            <li><span>Buy filled</span><span class="ao-v">{{rec:batch.victimTokens}}</span></li>
+            <li><span>Paid</span><span class="ao-v">{{rec:batch.victimPaid}}</span></li>
+            <li><span>Dust kept</span><span class="ao-v">at most 1 wei per order</span></li>
+          </ul>
+          <div class="ao-foot"><p class="note">Recorded on a local Anvil chain, {{rec:recordedAt}}, commit {{rec:commit}}</p><p class="note">Anvil dev accounts. Test funds, no real value.</p></div>
         </div>
       </div>
     </div>
