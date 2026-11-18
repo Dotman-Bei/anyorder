@@ -190,12 +190,54 @@
   .fills .act { grid-column: 1 / -1; margin-top: var(--s-2); }
   .fills .act .btn { width: 100%; }
 }
-/* the sandwich steps' panels, compact enough for the moment's 4:3 visual at every width */
+/* #sandwich: the steps' panels in the dark UI panel, compact enough for the moment's 4:3 visual at every width;
+   the third visual holds the island (the contrast table, where the guarantee stops, the run button) and the frame grows to hold it */
+#sandwich .ui-panel { color-scheme: dark;
+  --bg: var(--p-surface); --surface: var(--p-bg); --ink: var(--p-ink); --muted: var(--p-muted);
+  --line: color-mix(in oklab, var(--p-ink) 12%, transparent); --line-strong: color-mix(in oklab, var(--p-ink) 30%, transparent);
+  --action: var(--p-action); --action-ink: var(--p-action-ink); --error: color-mix(in oklab, #d92d20 72%, var(--p-ink)); }
 .mo-pc__visual .ui { width: min(100%, 440px); }
-.guarantee { display: grid; gap: var(--s-2); padding-top: var(--s-5); border-top: 1px solid var(--line); max-width: 52ch; }
-.guarantee h3 { font: 500 var(--t-lead)/1.3 var(--font-text); }
-/* the moment at rest on a phone (not pinned, as tall as its steps): two whole screens, so its last tile shows no footer */
-@media (max-width: 639px) { #sandwich:not(.is-live) { min-height: calc(2 * 100svh); } #sandwich .mo-pc__visual--lit { aspect-ratio: auto; } }
+#sandwich .mo-pc__visual--run { padding: var(--s-4); }
+.mo-pc__visual--run .ui { width: 100%; max-width: 640px; }
+#sandwich.is-live .mo-pc__visuals { aspect-ratio: auto; height: min(708px, calc(100svh - 128px)); }
+#sandwich.is-live .mo-pc__visual { aspect-ratio: auto; }
+#sandwich.is-live .mo-pc__visual--run .ui { max-height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+.sandwich { display: grid; }
+.sandwich > .note, .sandwich > .limits, .sandwich__run { margin: 0; padding: var(--s-3) var(--s-4) 0; }
+.contrast { width: 100%; margin-top: var(--s-3); border-collapse: collapse; font: 400 14px/20px var(--font-text); font-variant-numeric: tabular-nums; }
+.contrast :is(th, td) { padding: 10px 8px; text-align: left; vertical-align: top; border-top: 1px solid var(--u-line); }
+.contrast :is(th, td):first-child { padding-left: var(--s-4); }
+.contrast :is(th, td):last-child { padding-right: var(--s-4); }
+.contrast thead th { color: var(--u-muted); font-size: 13px; font-weight: 500; }
+.contrast tbody th { font-weight: 500; }
+.sandwich > .limits { margin-top: var(--s-3); border-top: 1px solid var(--u-line); }
+.limits p { margin: 0; color: var(--u-ink); font: 400 14px/20px var(--font-text); }
+.sandwich > .sandwich__run { display: grid; gap: var(--s-2); padding-bottom: var(--s-4); }
+.sandwich__run .btn { justify-self: start; height: auto; min-height: 44px; padding: var(--s-2) var(--s-3); white-space: normal; line-height: 1.25; }
+.sandwich .chain-notice { font: 400 14px/20px var(--font-text); }
+.sandwich .chain-notice .btn { background: color-mix(in oklab, var(--p-ink) 8%, var(--p-surface)); color: var(--p-ink); }
+.sandwich .tx-status { color: var(--u-ink); }
+.sandwich .tx-status:empty { display: none; }
+/* at rest from 640px the island's step stacks: the text, then the island across the row */
+@media (min-width: 640px) {
+  #sandwich:not(.is-live) .mo-pc__step:has(.mo-pc__visual--run) { grid-template-columns: minmax(0, 1fr); }
+  #sandwich:not(.is-live) .mo-pc__visual--run { grid-column: 1; grid-row: auto; aspect-ratio: auto; margin-top: var(--s-3); }
+}
+/* the moment at rest on a phone (not pinned, as tall as its steps): two whole screens, so its last tile shows no footer;
+   the contrast table reads as one block per row there */
+@media (max-width: 639px) {
+  #sandwich:not(.is-live) { min-height: calc(2 * 100svh); }
+  #sandwich .mo-pc__visual--lit { aspect-ratio: auto; padding: var(--s-2); }
+  #sandwich .ao-rows > li { padding: 8px 0; }
+  #sandwich .mo-pc__text { gap: var(--s-5); }
+  #sandwich .mo-pc__steps { gap: var(--s-4); }
+  .sandwich :is(.note, .limits p, .contrast) { font-size: 13px; line-height: 18px; }
+  .contrast thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .contrast, .contrast tbody, .contrast tr { display: block; }
+  .contrast tr { padding: 6px var(--s-4); border-top: 1px solid var(--u-line); }
+  .contrast :is(th, td), .contrast :is(th, td):first-child, .contrast :is(th, td):last-child { display: block; padding: 0; border: 0; }
+  .contrast td::before { content: attr(data-label) ": "; color: var(--u-muted); }
+}
 </style>
 <script>document.documentElement.classList.add('m-enter');setTimeout(()=>document.documentElement.classList.add('m-enter-done'),700)</script>
 <script src="/assets/backgrounds/backgrounds.js"></script>
@@ -354,7 +396,7 @@
         <ol class="mo-pc__steps">
           <li class="mo-pc__step">
             <h3>1. The front-run</h3>
-            <p>The attacker buys {{rec:pool.attackerTokens}} just before the victim. In a pool that raises the victim's price.</p>
+            <p>The attacker buys {{rec:pool.attackerTokens}} first; in a pool that lifts the victim's price.</p>
             <figure class="mo-pc__visual mo-pc__visual--lit">
               <div class="ui ui-panel">
                 <div class="ui-head"><span class="ui-title">Attacker buys first</span><span class="ui-spacer"></span><span class="ui-meta">{{rec:recordedAt}}</span></div>
@@ -367,7 +409,7 @@
           </li>
           <li class="mo-pc__step">
             <h3>2. The victim's buy</h3>
-            <p>In the pool the victim gets {{rec:pool.victimSandwiched}}, not {{rec:pool.victimAlone}}. In the batch: {{rec:batch.victimTokens}} for {{rec:batch.victimPaid}} either way.</p>
+            <p>In the pool the victim gets {{rec:pool.victimSandwiched}}, not {{rec:pool.victimAlone}}. The batch fills {{rec:batch.victimTokens}} for {{rec:batch.victimPaid}} either way.</p>
             <figure class="mo-pc__visual mo-pc__visual--lit">
               <div class="ui ui-panel">
                 <div class="ui-head"><span class="ui-title">The victim's fill</span><span class="ui-spacer"></span><span class="ui-meta">{{rec:recordedAt}}</span></div>
@@ -381,25 +423,32 @@
           </li>
           <li class="mo-pc__step">
             <h3>3. The back-run</h3>
-            <p>The attacker sells straight after. The pool pays a profit; in the batch both legs clear at your price.</p>
-            <figure class="mo-pc__visual mo-pc__visual--lit">
+            <p>The attacker sells straight after. The pool pays a profit; the batch clears both legs at one price.</p>
+            <figure class="mo-pc__visual mo-pc__visual--lit mo-pc__visual--run">
+              <!-- the island (SandwichRunner) replaces this panel's content with the same table from the recording, then from a run on the visitor's chain -->
               <div class="ui ui-panel" data-island="sandwich">
-                <div class="ui-head"><span class="ui-title">The attacker's result</span><span class="ui-spacer"></span><span class="ui-meta">{{rec:recordedAt}}</span></div>
-                <ul class="ao-rows">
-                  <li><span>Pool profit</span><span class="ao-v">{{rec:pool.attackerProfit}}</span></li>
-                  <li><span>Batch, tokens</span><span class="ao-v">{{rec:batch.attackerTokens}}</span></li>
-                  <li><span>Batch, wei</span><span class="ao-v is-mark">{{rec:batch.attackerWei}}</span></li>
-                </ul>
-                <p class="ao-foot">Recorded on a local Anvil chain, {{rec:recordedAt}}, commit {{rec:commit}}</p>
+                <div class="sandwich">
+                  <div class="ui-head"><span class="ui-title">Pool against batch</span></div>
+                  <p class="note sandwich__source">Recorded on a local Anvil chain, {{rec:recordedAt}}, commit {{rec:commit}}.</p>
+                  <table class="contrast">
+                    <thead>
+                      <tr><th scope="col">Same three orders</th><th scope="col">Constant-product pool (baseline)</th><th scope="col">AnyOrder batch</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><th scope="row">Victim gets</th><td data-label="Pool">{{rec:pool.victimSandwiched}} (alone: {{rec:pool.victimAlone}})</td><td data-label="Batch">{{rec:batch.victimTokens}} for {{rec:batch.victimPaid}} (alone: the same)</td></tr>
+                      <tr><th scope="row">Clearing price</th><td data-label="Pool">moves with every trade</td><td data-label="Batch">{{rec:batch.price}} (alone: {{rec:batch.priceAlone}})</td></tr>
+                      <tr><th scope="row">Attacker nets</th><td data-label="Pool">{{rec:pool.attackerProfit}} profit</td><td data-label="Batch">{{rec:batch.attackerTokens}} and {{rec:batch.attackerWei}} (rounding, kept by the contract)</td></tr>
+                    </tbody>
+                  </table>
+                  <p class="note sandwich__cast">The victim, the attacker and the makers are anvil dev accounts. Test funds, no real value.</p>
+                  <div class="limits">
+                    <p>Where the guarantee stops: the fill stays identical only when the attacker's buy and sell are the same size and priced outside every other order (condition C). A one-sided buy moves the price from {{rec:batch.priceAlone}} to {{rec:oneSided.price}}; the victim then pays {{rec:oneSided.victimPaid}} and the attacker pays {{rec:oneSided.attackerPaid}} at that same price.</p>
+                  </div>
+                </div>
               </div>
             </figure>
           </li>
         </ol>
-        <div class="guarantee">
-          <h3>Where the batch guarantee stops</h3>
-          <p>The victim gets the same fill as without the attacker under condition C: equal leg sizes, the buy limit above every other limit and the sell limit below every other.</p>
-          <p>One-sided, the attacker's buy moves the price to {{rec:oneSided.price}}: the victim pays {{rec:oneSided.victimPaid}} and the attacker pays {{rec:oneSided.attackerPaid}} at that price.</p>
-        </div>
       </div>
       <div class="mo-pc__visuals frame"></div>
     </div>
