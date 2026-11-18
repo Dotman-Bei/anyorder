@@ -1,0 +1,350 @@
+//! Seeded, hand-rolled property tests (`fe test` has no fuzzer). Every test
+//! draws its books from `KeccakRng` with a fixed seed, so a failure replays.
+
+use core::ptr::MemVec
+use std::evm::random::{KeccakRng, Rng, shuffle_slice}
+use ingot::{Clearing, Order, allocate, cost_ceil, proceeds_floor, select_price}
+use ingot::oracle::{demand_at, max_volume_between, supply_at, volume_at}
+
+const ROUNDS: u256 = 256
+const OWNERS: u256 = 4
+
+// A book of `n` orders: limits 2..=16, quantities 1..=9, owners 1..=OWNERS.
+// `owner_seq` is the order's draw index, so it is unique for every owner.
+fn small_book(_ n: u256) -> MemVec<Order> uses (rng: mut Rng) {
+    var book = MemVec<Order>::new()
+    var k: u256 = 0
+    while k < n {
+        book.push(
+            Order {
+                is_buy: rng.uniform(2) == 0,
+                limit: 2 + rng.uniform(15),
+                quantity: 1 + rng.uniform(9),
+                owner: 1 + rng.uniform(OWNERS),
+                owner_seq: k,
+            },
+        )
+        k += 1
+    }
+    book
+}
+
+// A book with token-sized quantities and wei-precise prices, so quote
+// rounding happens: quantities near 10^17 base units, prices near 10^16 wei.
+fn scaled_book(_ n: u256) -> MemVec<Order> uses (rng: mut Rng) {
+    var book = MemVec<Order>::new()
+    var k: u256 = 0
+    while k < n {
+        book.push(
+            Order {
+                is_buy: rng.uniform(2) == 0,
+                limit: (2 + rng.uniform(15)) * 1_000_000_000_000_000 + rng.uniform(997),
+                quantity: (1 + rng.uniform(9)) * 100_000_000_000_000_000 + rng.uniform(1_000_003),
+                owner: 1 + rng.uniform(OWNERS),
+                owner_seq: k,
+            },
+        )
+        k += 1
+    }
+    book
+}
+
+fn min_limit(_ book: MemVec<Order>) -> u256 {
+    var low = book[0].limit
+    for o in book {
+        if o.limit < low {
+            low = o.limit
+        }
+    }
+    low
+}
+
+fn max_limit(_ book: MemVec<Order>) -> u256 {
+    var high = book[0].limit
+    for o in book {
+        if o.limit > high {
+            high = o.limit
+        }
+    }
+    high
+}
+
+// Per-owner totals: base bought, base sold, quote paid, quote received, by
+// owner 0..=OWNERS (index 0 unused).
+fn owner_totals(_ book: MemVec<Order>, _ fills: MemVec<u256>, _ c: Clearing) -> MemVec<u256> {
+    var totals = MemVec<u256>::new()
+    var j: u256 = 0
+    while j < 4 * (OWNERS + 1) {
+        totals.push(0)
+        j += 1
+    }
+    var i: usize = 0
+    while i < book.len() {
+        let o = book[i]
+        let f = fills[i]
+        let at: usize = (o.owner * 4).downcast_unchecked()
+        if o.is_buy {
+            totals.set(at, totals[at] + f)
+            totals.set(
+                    at + 2,
+                    totals[at + 2] + cost_ceil(quantity: f, price: c.price).as_wei(),
+                )
+        } else {
+            totals.set(at + 1, totals[at + 1] + f)
+            totals
+                .set(
+                    at + 3,
+                    totals[at + 3] + proceeds_floor(quantity: f, price: c.price).as_wei(),
+                )
+        }
+        i += 1
+    }
+    totals
+}
+
+#[test]
+fn property_fills_respect_limits_and_strictly_better_orders_fill() {
+    var rng = KeccakRng::seeded(1)
+    var round: u256 = 0
+    while round < ROUNDS {
+        let n = 1 + rng.uniform(14)
+        let book = with (Rng = rng) {
+            small_book(n)
+        }
+        let c = select_price(book)
+        let fills = allocate(book, c)
+        var i: usize = 0
+        while i < book.len() {
+            let o = book[i]
+            let f = fills[i]
+            assert!(f <= o.quantity)
+            if f > 0 {
+                assert!(c.traded)
+                if o.is_buy {
+                    assert!(o.limit >= c.price)
+                } else {
+                    assert!(o.limit <= c.price)
+                }
+            }
+            if c.traded && ((o.is_buy && o.limit > c.price) || (!o.is_buy && o.limit < c.price)) {
+                assert!(f == o.quantity)
+            }
+            i += 1
+        }
+        round += 1
+    }
+}
+
+#[test]
+fn property_base_and_quote_conservation() {
+    var rng = KeccakRng::seeded(2)
+    var round: u256 = 0
+    while round < ROUNDS {
+        let n = 1 + rng.uniform(14)
+        let book = with (Rng = rng) {
+            scaled_book(n)
+        }
+        let c = select_price(book)
+        let fills = allocate(book, c)
+        var bought: u256 = 0
+        var sold: u256 = 0
+        var paid: u256 = 0
+        var received: u256 = 0
+        var filled_orders: u256 = 0
+        var i: usize = 0
+        while i < book.len() {
+            let f = fills[i]
+            if f > 0 {
+                filled_orders += 1
+            }
+            if book[i].is_buy {
+                bought += f
+                paid += cost_ceil(quantity: f, price: c.price).as_wei()
+            } else {
+                sold += f
+                received += proceeds_floor(quantity: f, price: c.price).as_wei()
+            }
+            i += 1
+        }
+        assert!(bought == sold)
+        assert!(bought == c.volume)
+        // Buyers always cover sellers; the dust is at most one wei per filled order.
+        assert!(paid >= received)
+        assert!(paid - received <= filled_orders)
+        round += 1
+    }
+}
+
+#[test]
+fn property_volume_is_maximal_over_every_integer_price() {
+    var rng = KeccakRng::seeded(3)
+    var round: u256 = 0
+    while round < ROUNDS {
+        let n = 1 + rng.uniform(14)
+        let book = with (Rng = rng) {
+            small_book(n)
+        }
+        let c = select_price(book)
+        // Limits are 2..=16, so prices 0..=18 cover every price that matters.
+        let best = max_volume_between(book, low: 0, high: 18)
+        if c.traded {
+            assert!(c.volume == best)
+            assert!(volume_at(book, c.price) == c.volume)
+            assert!(demand_at(book, c.price) == c.demand)
+            assert!(supply_at(book, c.price) == c.supply)
+        } else {
+            assert!(best == 0)
+        }
+        round += 1
+    }
+}
+
+#[test]
+fn permutation_full_shuffle_keeps_price_and_owner_totals() {
+    var rng = KeccakRng::seeded(4)
+    var book = with (Rng = rng) {
+        scaled_book(14)
+    }
+    let first = select_price(book)
+    let first_totals = owner_totals(book, allocate(book, first), first)
+    var round: u256 = 0
+    while round < ROUNDS {
+        with (Rng = rng) {
+            shuffle_slice(mut book.as_slice())
+        }
+        let c = select_price(book)
+        assert!(
+            c.traded == first.traded && c.price == first.price && c.volume == first.volume,
+        )
+        let totals = owner_totals(book, allocate(book, c), c)
+        var j: usize = 0
+        while j < totals.len() {
+            assert!(totals[j] == first_totals[j])
+            j += 1
+        }
+        round += 1
+    }
+}
+
+#[test]
+fn sandwich_invariance_property() {
+    var rng = KeccakRng::seeded(5)
+    var round: u256 = 0
+    var checked: u256 = 0
+    while round < ROUNDS {
+        let n = 1 + rng.uniform(14)
+        let book = with (Rng = rng) {
+            small_book(n)
+        }
+        let c = select_price(book)
+        let size = 1 + rng.uniform(30)
+
+        // Condition C: equal legs, the buy above and the sell below every other limit.
+        if c.traded {
+            var attacked = MemVec<Order>::new()
+            for o in book {
+                attacked.push(o)
+            }
+            attacked
+                .push(
+                    Order {
+                        is_buy: true,
+                        limit: max_limit(book) + 1,
+                        quantity: size,
+                        owner: 99,
+                        owner_seq: 0,
+                    },
+                )
+            attacked
+                .push(
+                    Order {
+                        is_buy: false,
+                        limit: min_limit(book) - 1,
+                        quantity: size,
+                        owner: 99,
+                        owner_seq: 1,
+                    },
+                )
+            let ca = select_price(attacked)
+            assert!(
+                ca.traded && ca.price == c.price && ca.volume == c.volume + size,
+            )
+            let fills = allocate(book, c)
+            let attacked_fills = allocate(attacked, ca)
+            var i: usize = 0
+            while i < book.len() {
+                assert!(attacked_fills[i] == fills[i])
+                i += 1
+            }
+            assert!(
+                attacked_fills[book.len()] == size && attacked_fills[book.len() + 1] == size,
+            )
+            checked += 1
+        }
+
+        // Unconditional: whatever the limits, a trader whose equal buy and
+        // sell both fill in full nets zero tokens and at most zero wei.
+        var washed = MemVec<Order>::new()
+        for o in book {
+            washed.push(o)
+        }
+        let wash_size = 1 + rng.uniform(9)
+        washed
+            .push(
+                Order {
+                    is_buy: true,
+                    limit: 1 + rng.uniform(17),
+                    quantity: wash_size,
+                    owner: 98,
+                    owner_seq: 0,
+                },
+            )
+        washed
+            .push(
+                Order {
+                    is_buy: false,
+                    limit: 1 + rng.uniform(17),
+                    quantity: wash_size,
+                    owner: 98,
+                    owner_seq: 1,
+                },
+            )
+        let cw = select_price(washed)
+        let wash_fills = allocate(washed, cw)
+        let last = washed.len()
+        if wash_fills[last - 2] == wash_size && wash_fills[last - 1] == wash_size {
+            let scaled = wash_size * 1_000_000_000_000_000 + 7
+            let price = cw.price * 1_000_000_000_000_000 + 3
+            assert!(
+                proceeds_floor(quantity: scaled, price) <= cost_ceil(quantity: scaled, price),
+            )
+        }
+        round += 1
+    }
+    assert!(checked > 0)
+
+    // The in-range wash pair that moves the price: the book clears at 7 alone,
+    // at 6 with the pair, and the pair's owner still nets <= 0.
+    var book = MemVec<Order>::new()
+    book.push(
+        Order { is_buy: true, limit: 7, quantity: 5, owner: 1, owner_seq: 0 },
+    )
+    book.push(
+        Order { is_buy: false, limit: 2, quantity: 5, owner: 2, owner_seq: 0 },
+    )
+    assert!(select_price(book).price == 7)
+    book.push(
+        Order { is_buy: true, limit: 6, quantity: 1, owner: 3, owner_seq: 0 },
+    )
+    book.push(
+        Order { is_buy: false, limit: 5, quantity: 1, owner: 3, owner_seq: 1 },
+    )
+    let moved = select_price(book)
+    assert!(moved.price == 6)
+    let moved_fills = allocate(book, moved)
+    assert!(moved_fills[2] == 1 && moved_fills[3] == 1)
+    assert!(
+        proceeds_floor(quantity: 1, price: moved.price)
+            <= cost_ceil(quantity: 1, price: moved.price),
+    )
+}
