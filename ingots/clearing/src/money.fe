@@ -1,0 +1,15 @@
+use core::num::{mul_div, mul_div_ceil}
+use std::evm::wei
+use ingot::types::UNIT
+
+/// What a buyer pays for `quantity` base units at `price` wei per token:
+/// rounded up, so rounding always favours the contract.
+pub fn cost_ceil(quantity: u256, price: u256) -> Wei {
+    wei(mul_div_ceil(quantity, price, UNIT))
+}
+
+/// What a seller receives for `quantity` base units at `price` wei per token:
+/// rounded down, so rounding always favours the contract.
+pub fn proceeds_floor(quantity: u256, price: u256) -> Wei {
+    wei(mul_div(quantity, price, UNIT))
+}

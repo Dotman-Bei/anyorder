@@ -1,0 +1,5 @@
+[workspace]
+name = "anyorder"
+version = "0.1.0"
+members = ["ingots/clearing", "ingots/exchange"]
+exclude = ["target", "web", "spikes"]

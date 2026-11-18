@@ -1,0 +1,72 @@
+//! TestToken basics, driven through a proxy actor so `ctx.caller()` is a
+//! second address (the walking skeleton's multi-actor test).
+
+use std::abi::sol
+use ingot::token::{TestToken, TokenMsg}
+
+msg HolderMsg {
+    #[selector = sol("send(address,address,uint256)")]
+    Send { token: Address, to: Address, amount: u256 } -> bool,
+}
+
+/// TEST ONLY: holds tokens and transfers them as itself.
+pub contract TokenHolder uses (call: mut Call) {
+    recv HolderMsg {
+        Send { token, to, amount } -> bool uses (mut call) {
+            call.call(
+                addr: token,
+                gas: 100000,
+                value: Wei::zero(),
+                message: TokenMsg::Transfer { to, amount },
+            )
+        }
+    }
+}
+
+fn balance_of(token: Address, account: Address) -> u256 uses (evm: mut Evm) {
+    evm.call(
+        addr: token,
+        gas: 100000,
+        value: Wei::zero(),
+        message: TokenMsg::BalanceOf { account },
+    )
+}
+
+#[test]
+fn token_proxy_actor_transfers_as_itself() uses (evm: mut Evm) {
+    let token = evm.create2<TestToken>(value: Wei::zero(), args: (), salt: 0)
+    let holder = evm.create2<TokenHolder>(value: Wei::zero(), args: (), salt: 1)
+    let minted: bool = evm
+        .call(
+            addr: token,
+            gas: 200000,
+            value: Wei::zero(),
+            message: TokenMsg::Mint { to: holder, amount: 100 },
+        )
+    assert!(minted)
+    let receiver = Address::new(0xbeef)
+    let sent: bool = evm
+        .call(
+            addr: holder,
+            gas: 300000,
+            value: Wei::zero(),
+            message: HolderMsg::Send { token, to: receiver, amount: 40 },
+        )
+    assert!(sent)
+    assert!(balance_of(token, account: holder) == 60)
+    assert!(balance_of(token, account: receiver) == 40)
+}
+
+#[test(should_revert)]
+fn token_transfer_beyond_balance_reverts() uses (evm: mut Evm) {
+    let token = evm.create2<TestToken>(value: Wei::zero(), args: (), salt: 0)
+    let holder = evm.create2<TokenHolder>(value: Wei::zero(), args: (), salt: 1)
+    // The holder never received any tokens, so sending one reverts.
+    let _: bool = evm
+        .call(
+            addr: holder,
+            gas: 300000,
+            value: Wei::zero(),
+            message: HolderMsg::Send { token, to: holder, amount: 1 },
+        )
+}

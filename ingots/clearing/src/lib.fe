@@ -1,0 +1,10 @@
+//! AnyOrder's clearing core: a uniform-price call auction as pure functions.
+//!
+//! Nothing in this ingot declares an effect. Clearing has no `Ctx`, so it
+//! cannot read the caller, the block or the time; it touches no storage and
+//! cannot call out. The only identity it reads is each order's recorded owner,
+//! used only for the final tie-breaks (owner, then the owner's own order
+//! sequence), which decide at most one base unit per order.
+
+pub use types::{Clearing, Order, UNIT, MAX_QUANTITY}
+pub use money::{cost_ceil, proceeds_floor}

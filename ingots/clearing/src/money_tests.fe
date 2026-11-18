@@ -1,0 +1,22 @@
+use std::evm::wei
+use ingot::{cost_ceil, proceeds_floor}
+
+#[test]
+fn money_rounds_buyers_up_and_sellers_down() {
+    // 10 tokens + 1 base unit at 0.011 ETH per token is not a whole number of wei.
+    let odd = 10_000_000_000_000_000_001
+    let price = 11_000_000_000_000_000
+    assert!(
+        cost_ceil(quantity: odd, price) == wei(110_000_000_000_000_001),
+    )
+    assert!(
+        proceeds_floor(quantity: odd, price) == wei(110_000_000_000_000_000),
+    )
+    // A whole number of wei rounds neither way.
+    assert!(
+        cost_ceil(quantity: 15_000_000_000_000_000_000, price) == wei(165_000_000_000_000_000),
+    )
+    assert!(
+        proceeds_floor(quantity: 15_000_000_000_000_000_000, price) == wei(165_000_000_000_000_000),
+    )
+}

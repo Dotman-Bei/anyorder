@@ -1,0 +1,113 @@
+//! TestToken: a plain 18-decimal ERC20 with an owner-only mint, for the demo
+//! and the tests. Adapted from the Fe guide's ERC20 example and the
+//! `erc20.fe` test fixture of argotorg/fe v26.6.0 (Apache-2.0).
+
+use std::abi::sol
+use std::evm::StorageMap
+
+pub msg TokenMsg {
+    #[selector = sol("decimals()")]
+    Decimals -> u8,
+    #[selector = sol("totalSupply()")]
+    TotalSupply -> u256,
+    #[selector = sol("balanceOf(address)")]
+    BalanceOf { account: Address } -> u256,
+    #[selector = sol("allowance(address,address)")]
+    Allowance { owner: Address, spender: Address } -> u256,
+    #[selector = sol("transfer(address,uint256)")]
+    Transfer { to: Address, amount: u256 } -> bool,
+    #[selector = sol("approve(address,uint256)")]
+    Approve { spender: Address, amount: u256 } -> bool,
+    #[selector = sol("transferFrom(address,address,uint256)")]
+    TransferFrom { from: Address, to: Address, amount: u256 } -> bool,
+    #[selector = sol("mint(address,uint256)")]
+    Mint { to: Address, amount: u256 } -> bool,
+}
+
+#[event]
+pub struct Transfer {
+    #[indexed]
+    pub from: Address,
+    #[indexed]
+    pub to: Address,
+    pub value: u256,
+}
+
+#[event]
+pub struct Approval {
+    #[indexed]
+    pub owner: Address,
+    #[indexed]
+    pub spender: Address,
+    pub value: u256,
+}
+
+pub struct Ledger {
+    pub minter: Address,
+    pub total_supply: u256,
+    pub balances: StorageMap<Address, u256>,
+    pub allowances: StorageMap<(Address, Address), u256>,
+}
+
+fn move_tokens(from: Address, to: Address, amount: u256)
+uses (ledger: mut Ledger, log: mut Log)
+{
+    let have = ledger.balances.get(key: from)
+    assert!(have >= amount, "balance too low")
+    ledger.balances.set(key: from, value: have - amount)
+    ledger.balances.set(key: to, value: ledger.balances.get(key: to) + amount)
+    log.emit(Transfer { from, to, value: amount })
+}
+
+pub contract TestToken uses (ctx: Ctx, log: mut Log) {
+    mut ledger: Ledger,
+
+    init() uses (ctx, mut ledger) { ledger.minter = ctx.caller() }
+
+    recv TokenMsg {
+        Decimals -> u8 {
+            18
+        }
+
+        TotalSupply -> u256 uses (ledger) {
+            ledger.total_supply
+        }
+
+        BalanceOf { account } -> u256 uses (ledger) {
+            ledger.balances.get(key: account)
+        }
+
+        Allowance { owner, spender } -> u256 uses (ledger) {
+            ledger.allowances.get(key: (owner, spender))
+        }
+
+        Transfer { to, amount } -> bool uses (ctx, mut ledger, mut log) {
+            move_tokens(from: ctx.caller(), to, amount)
+            true
+        }
+
+        Approve { spender, amount } -> bool uses (ctx, mut ledger, mut log) {
+            ledger.allowances.set(key: (ctx.caller(), spender), value: amount)
+            log.emit(Approval { owner: ctx.caller(), spender, value: amount })
+            true
+        }
+
+        TransferFrom { from, to, amount } -> bool
+        uses (ctx, mut ledger, mut log)
+        {
+            let allowed = ledger.allowances.get(key: (from, ctx.caller()))
+            assert!(allowed >= amount, "allowance too low")
+            ledger.allowances.set(key: (from, ctx.caller()), value: allowed - amount)
+            move_tokens(from, to, amount)
+            true
+        }
+
+        Mint { to, amount } -> bool uses (ctx, mut ledger, mut log) {
+            assert!(ctx.caller() == ledger.minter, "only the minter")
+            ledger.total_supply += amount
+            ledger.balances.set(key: to, value: ledger.balances.get(key: to) + amount)
+            log.emit(Transfer { from: Address::new(0), to, value: amount })
+            true
+        }
+    }
+}

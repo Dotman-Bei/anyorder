@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # Any Fe release from 26.5.0 on is allowed for the contest; this build pins 26.6.0.
+  FE_VERSION: v26.6.0
+
+jobs:
+  fe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Fe
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/argotorg/fe/master/feup/feup.sh | bash -s -- --version "$FE_VERSION" --no-modify-path
+          echo "$HOME/.fe/bin" >> "$GITHUB_PATH"
+      - run: fe --version
+      # fe fmt does not walk a workspace root: check each member.
+      - run: fe fmt --check ingots/clearing
+      - run: fe fmt --check ingots/exchange
+      - run: fe test
+      - run: fe build

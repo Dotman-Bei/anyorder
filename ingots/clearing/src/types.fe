@@ -1,0 +1,39 @@
+/// Base units per whole token. Prices are quoted in wei per whole token.
+pub const UNIT: u256 = 1_000_000_000_000_000_000
+
+/// The largest order quantity, in base units (10^12 whole tokens). The
+/// rationing arithmetic relies on it: quantity times remainder stays far
+/// below 2^256 for any batch the contract accepts.
+pub const MAX_QUANTITY: u256 = 1_000_000_000_000_000_000_000_000_000_000
+
+/// One limit order as clearing sees it. `owner` is the recorded owner's
+/// address word and `owner_seq` that owner's own order sequence; clearing
+/// reads them only for the final tie-breaks of rationing.
+pub struct Order {
+    pub is_buy: bool,
+    pub limit: u256,
+    pub quantity: u256,
+    pub owner: u256,
+    pub owner_seq: u256,
+}
+
+impl Copy for Order {}
+
+/// The outcome of price selection. `demand` and `supply` are the totals at
+/// `price`: buys with limit at or above it, sells with limit at or below it.
+pub struct Clearing {
+    pub traded: bool,
+    pub price: u256,
+    pub volume: u256,
+    pub demand: u256,
+    pub supply: u256,
+}
+
+impl Copy for Clearing {}
+
+impl Clearing {
+    /// The batch does not trade: no price matches any volume.
+    pub fn none() -> Clearing {
+        Clearing { traded: false, price: 0, volume: 0, demand: 0, supply: 0 }
+    }
+}

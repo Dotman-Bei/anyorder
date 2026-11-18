@@ -1,0 +1,11 @@
+# Build outputs
+out/
+spikes/gas/out/
+# Web
+web/node_modules/
+web/dist/
+web/public/deployment.json
+# The design skill's finish-gate state: local only
+web/.taste-skill/
+# Python
+__pycache__/

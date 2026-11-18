@@ -1,0 +1,5 @@
+//! The AnyOrder exchange ingot: the `AnyOrder` contract, the `TestToken` it
+//! trades, and the `ConstantProductPool` baseline for the sandwich contrast.
+//! `AnyOrderTestClock`, `Trader` and `Reenterer` are test-only harnesses.
+
+pub use token::{TestToken, TokenMsg}
