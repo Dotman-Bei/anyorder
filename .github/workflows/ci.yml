@@ -32,3 +32,5 @@ jobs:
       # The exact-rational reference: vectors are current, and the rule matches the oracle.
       - run: python ref/clearing_ref.py --check
       - run: python ref/clearing_ref.py --selftest
+      # The deployed contracts' ABIs still match their frozen snapshots.
+      - run: bash scripts/check-abi.sh

@@ -1,0 +1,688 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "name": "genesis",
+        "type": "uint256"
+      },
+      {
+        "name": "batch_length",
+        "type": "uint256"
+      },
+      {
+        "name": "max_orders",
+        "type": "uint256"
+      },
+      {
+        "name": "min_quantity",
+        "type": "uint256"
+      },
+      {
+        "name": "max_price",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "depositEth",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "depositToken",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "withdraw",
+    "inputs": [
+      {
+        "name": "base",
+        "type": "uint256"
+      },
+      {
+        "name": "quote",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "placeBuy",
+    "inputs": [
+      {
+        "name": "limit",
+        "type": "uint256"
+      },
+      {
+        "name": "quantity",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "batch",
+            "type": "uint256"
+          },
+          {
+            "name": "index",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "placeSell",
+    "inputs": [
+      {
+        "name": "limit",
+        "type": "uint256"
+      },
+      {
+        "name": "quantity",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "batch",
+            "type": "uint256"
+          },
+          {
+            "name": "index",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "clear",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "traded",
+            "type": "bool"
+          },
+          {
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "name": "volume",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "claim",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      },
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "base",
+            "type": "uint256"
+          },
+          {
+            "name": "quote",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "token",
+            "type": "address"
+          },
+          {
+            "name": "genesis",
+            "type": "uint256"
+          },
+          {
+            "name": "batch_length",
+            "type": "uint256"
+          },
+          {
+            "name": "max_orders",
+            "type": "uint256"
+          },
+          {
+            "name": "min_quantity",
+            "type": "uint256"
+          },
+          {
+            "name": "max_price",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "currentBatch",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "batchInfo",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "start",
+            "type": "uint256"
+          },
+          {
+            "name": "end",
+            "type": "uint256"
+          },
+          {
+            "name": "order_count",
+            "type": "uint256"
+          },
+          {
+            "name": "status",
+            "type": "uint8"
+          },
+          {
+            "name": "traded",
+            "type": "bool"
+          },
+          {
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "name": "volume",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "orderAt",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      },
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "name": "is_buy",
+            "type": "bool"
+          },
+          {
+            "name": "limit",
+            "type": "uint256"
+          },
+          {
+            "name": "quantity",
+            "type": "uint256"
+          },
+          {
+            "name": "owner_seq",
+            "type": "uint256"
+          },
+          {
+            "name": "locked",
+            "type": "uint256"
+          },
+          {
+            "name": "filled",
+            "type": "uint256"
+          },
+          {
+            "name": "claimed",
+            "type": "bool"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "preview",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "traded",
+            "type": "bool"
+          },
+          {
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "name": "volume",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "balances",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "base",
+            "type": "uint256"
+          },
+          {
+            "name": "quote",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "Deposited",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "base",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "quote",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Withdrawn",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "base",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "quote",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrderPlaced",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "index",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "is_buy",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "quantity",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BatchCleared",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "traded",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "volume",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Claimed",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "index",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "base",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "quote",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "ZeroAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Reentrant",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientFunds",
+    "inputs": [
+      {
+        "name": "available",
+        "type": "uint256"
+      },
+      {
+        "name": "required",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "TransferFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "BelowMinimum",
+    "inputs": [
+      {
+        "name": "quantity",
+        "type": "uint256"
+      },
+      {
+        "name": "minimum",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AboveMaximum",
+    "inputs": [
+      {
+        "name": "quantity",
+        "type": "uint256"
+      },
+      {
+        "name": "maximum",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "PriceOutOfRange",
+    "inputs": [
+      {
+        "name": "limit",
+        "type": "uint256"
+      },
+      {
+        "name": "max_price",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "BatchFull",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      },
+      {
+        "name": "max_orders",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "BatchStillOpen",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      },
+      {
+        "name": "ends_at",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AlreadyCleared",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotCleared",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnknownOrder",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      },
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AlreadyClaimed",
+    "inputs": [
+      {
+        "name": "batch",
+        "type": "uint256"
+      },
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ]
+  }
+]
