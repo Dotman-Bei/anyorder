@@ -1,0 +1,27 @@
+name: Native
+
+# Stretch: the same pure clearing code, checked and tested on Fe's native
+# backend. Native executables are built only on Linux and macOS, so this job is
+# never part of the Windows demo.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  FE_VERSION: v26.6.0
+
+jobs:
+  clearing-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Fe
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/argotorg/fe/master/feup/feup.sh | bash -s -- --version "$FE_VERSION" --no-modify-path
+          echo "$HOME/.fe/bin" >> "$GITHUB_PATH"
+      - run: fe --version
+      - run: fe check ingots/clearing --backend native
+      - run: fe test ingots/clearing --backend native --filter vector_
