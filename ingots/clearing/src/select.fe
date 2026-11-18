@@ -1,0 +1,137 @@
+use core::ops::{Eq, Ord}
+use core::ptr::MemVec
+use ingot::types::{Clearing, Order}
+
+// A resting quantity at one limit price, ordered by the limit.
+struct Level { limit: u256, quantity: u256 }
+
+impl Copy for Level {}
+
+impl Eq for Level {
+    fn eq(self, _ other: Level) -> bool {
+        self.limit == other.limit && self.quantity == other.quantity
+    }
+}
+
+impl Ord for Level {
+    fn lt(self, _ other: Level) -> bool {
+        self.limit < other.limit
+    }
+    fn le(self, _ other: Level) -> bool {
+        self.limit <= other.limit
+    }
+    fn gt(self, _ other: Level) -> bool {
+        self.limit > other.limit
+    }
+    fn ge(self, _ other: Level) -> bool {
+        self.limit >= other.limit
+    }
+}
+
+fn smaller(_ a: u256, _ b: u256) -> u256 {
+    if a < b { a } else { b }
+}
+
+fn gap(_ a: u256, _ b: u256) -> u256 {
+    if a >= b { a - b } else { b - a }
+}
+
+/// Chooses the uniform clearing price of a batch. The candidates are the
+/// distinct limit prices. Among them it maximises the matched volume
+/// min(demand, supply), then minimises the imbalance |demand - supply|, then
+/// takes the highest remaining price at which demand is at least supply, or,
+/// if there is none, the lowest remaining price. The result depends only on
+/// the multiset of orders, never on their position in `orders`.
+pub fn select_price(_ orders: MemVec<Order>) -> Clearing {
+    var buys = MemVec<Level>::new()
+    var sells = MemVec<Level>::new()
+    var prices = MemVec<u256>::new()
+    var demand: u256 = 0
+    for o in orders {
+        if o.is_buy {
+            buys.push(Level { limit: o.limit, quantity: o.quantity })
+            demand += o.quantity
+        } else {
+            sells.push(Level { limit: o.limit, quantity: o.quantity })
+        }
+        prices.push(o.limit)
+    }
+    buys.sort()
+    sells.sort()
+    prices.sort()
+
+    var supply: u256 = 0
+    var next_buy: usize = 0
+    var next_sell: usize = 0
+    var found = false
+    var best_volume: u256 = 0
+    var best_gap: u256 = 0
+    var low_price: u256 = 0
+    var low_demand: u256 = 0
+    var low_supply: u256 = 0
+    var has_high = false
+    var high_price: u256 = 0
+    var high_demand: u256 = 0
+    var high_supply: u256 = 0
+
+    var i: usize = 0
+    while i < prices.len() {
+        let p = prices[i]
+        if i == 0 || p != prices[i - 1] {
+            // Demand at p: buys whose limit is at least p.
+            while next_buy < buys.len() && buys[next_buy].limit < p {
+                demand -= buys[next_buy].quantity
+                next_buy += 1
+            }
+            // Supply at p: sells whose limit is at most p.
+            while next_sell < sells.len() && sells[next_sell].limit <= p {
+                supply += sells[next_sell].quantity
+                next_sell += 1
+            }
+            let volume = smaller(demand, supply)
+            let imbalance = gap(demand, supply)
+            if volume > 0 {
+                if !found
+                    || volume > best_volume
+                    || (volume == best_volume && imbalance < best_gap) {
+                    found = true
+                    best_volume = volume
+                    best_gap = imbalance
+                    low_price = p
+                    low_demand = demand
+                    low_supply = supply
+                    has_high = demand >= supply
+                    high_price = p
+                    high_demand = demand
+                    high_supply = supply
+                } else if volume == best_volume && imbalance == best_gap && demand >= supply {
+                    has_high = true
+                    high_price = p
+                    high_demand = demand
+                    high_supply = supply
+                }
+            }
+        }
+        i += 1
+    }
+
+    if !found {
+        return Clearing::none()
+    }
+    if has_high {
+        return Clearing {
+            traded: true,
+            price: high_price,
+            volume: best_volume,
+            demand: high_demand,
+            supply: high_supply,
+        }
+    }
+    Clearing {
+        traded: true,
+        price: low_price,
+        volume: best_volume,
+        demand: low_demand,
+        supply: low_supply,
+    }
+}

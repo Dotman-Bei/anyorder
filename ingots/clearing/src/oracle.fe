@@ -1,0 +1,46 @@
+//! A brute-force oracle for the property tests: demand and supply at any
+//! price, computed directly from the definition.
+
+use core::ptr::MemVec
+use ingot::types::Order
+
+/// Total quantity of buys whose limit is at least `price`.
+pub fn demand_at(_ orders: MemVec<Order>, _ price: u256) -> u256 {
+    var total: u256 = 0
+    for o in orders {
+        if o.is_buy && o.limit >= price {
+            total += o.quantity
+        }
+    }
+    total
+}
+
+/// Total quantity of sells whose limit is at most `price`.
+pub fn supply_at(_ orders: MemVec<Order>, _ price: u256) -> u256 {
+    var total: u256 = 0
+    for o in orders {
+        if !o.is_buy && o.limit <= price {
+            total += o.quantity
+        }
+    }
+    total
+}
+
+/// The matched volume min(demand, supply) at `price`.
+pub fn volume_at(_ orders: MemVec<Order>, _ price: u256) -> u256 {
+    let d = demand_at(orders, price)
+    let s = supply_at(orders, price)
+    if d < s { d } else { s }
+}
+
+/// The largest matched volume over every integer price in `[low, high]`.
+pub fn max_volume_between(_ orders: MemVec<Order>, low: u256, high: u256) -> u256 {
+    var best: u256 = 0
+    var p = low
+    while p <= high {
+        let v = volume_at(orders, p)
+        if v > best { best = v }
+        p += 1
+    }
+    best
+}

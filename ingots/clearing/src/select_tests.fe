@@ -1,0 +1,66 @@
+use core::ptr::MemVec
+use ingot::{Order, select_price}
+use ingot::oracle::max_volume_between
+
+fn o(_ is_buy: bool, _ limit: u256, _ quantity: u256, _ owner: u256) -> Order {
+    Order { is_buy, limit, quantity, owner, owner_seq: 0 }
+}
+
+#[test]
+fn select_simple_cross_takes_the_highest_tie_with_demand_at_least_supply() {
+    var book = MemVec<Order>::new()
+    book.push(o(true, 10, 5, 1))
+    book.push(o(false, 8, 5, 2))
+    let c = select_price(book)
+    assert!(c.traded && c.price == 10 && c.volume == 5)
+}
+
+#[test]
+fn select_no_cross_does_not_trade() {
+    var book = MemVec<Order>::new()
+    book.push(o(true, 7, 5, 1))
+    book.push(o(false, 9, 5, 2))
+    let c = select_price(book)
+    assert!(!c.traded && c.volume == 0)
+}
+
+#[test]
+fn select_excess_supply_takes_the_lowest_tie() {
+    var book = MemVec<Order>::new()
+    book.push(o(false, 11, 10, 1))
+    book.push(o(true, 12, 4, 2))
+    let c = select_price(book)
+    assert!(c.traded && c.price == 11 && c.volume == 4)
+    assert!(c.demand == 4 && c.supply == 10)
+}
+
+#[test]
+fn select_strictly_better_buy_is_never_left_needing_rationing() {
+    // Lowest-price tie-breaking would pick 10 and leave the buy at 12 short.
+    var book = MemVec<Order>::new()
+    book.push(o(true, 12, 10, 1))
+    book.push(o(false, 8, 3, 2))
+    book.push(o(false, 10, 3, 3))
+    let c = select_price(book)
+    assert!(c.price == 12 && c.volume == 6)
+}
+
+#[test]
+fn select_mixed_sign_tie_takes_the_last_excess_demand_price() {
+    var book = MemVec<Order>::new()
+    book.push(o(true, 10, 3, 1))
+    book.push(o(false, 5, 1, 2))
+    book.push(o(true, 1, 7, 3))
+    book.push(o(false, 2, 6, 4))
+    book.push(o(false, 11, 2, 5))
+    book.push(o(false, 6, 2, 6))
+    book.push(o(true, 8, 5, 7))
+    book.push(o(false, 8, 6, 8))
+    book.push(o(true, 7, 6, 9))
+    book.push(o(true, 8, 1, 10))
+    book.push(o(true, 12, 4, 11))
+    book.push(o(false, 0, 4, 11))
+    let c = select_price(book)
+    assert!(c.price == 7 && c.volume == 13)
+    assert!(c.volume == max_volume_between(book, low: 0, high: 13))
+}
