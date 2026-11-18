@@ -2,4 +2,5 @@
 //! trades, and the `ConstantProductPool` baseline for the sandwich contrast.
 //! `AnyOrderTestClock`, `Trader` and `Reenterer` are test-only harnesses.
 
+pub use interface::*
 pub use token::{TestToken, TokenMsg}

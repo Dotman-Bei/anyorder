@@ -1,0 +1,180 @@
+//! AnyOrder's public interface: the messages, return values, events and errors
+//! that make up its ABI. The signatures here are frozen in the spec.
+
+use std::abi::sol
+
+#[abi]
+pub struct OrderRef { pub batch: u256, pub index: u256 }
+
+impl Copy for OrderRef {}
+
+#[abi]
+pub struct ClearingView { pub traded: bool, pub price: u256, pub volume: u256 }
+
+impl Copy for ClearingView {}
+
+#[abi]
+pub struct Payout { pub base: u256, pub quote: Wei }
+
+impl Copy for Payout {}
+
+#[abi]
+pub struct ConfigView {
+    pub token: Address,
+    pub genesis: Timestamp,
+    pub batch_length: Duration,
+    pub max_orders: u256,
+    pub min_quantity: u256,
+    pub max_price: u256,
+}
+
+impl Copy for ConfigView {}
+
+/// `status`: 0 open, 1 closed and waiting to be cleared, 2 cleared.
+#[abi]
+pub struct BatchView {
+    pub start: Timestamp,
+    pub end: Timestamp,
+    pub order_count: u256,
+    pub status: u8,
+    pub traded: bool,
+    pub price: u256,
+    pub volume: u256,
+}
+
+impl Copy for BatchView {}
+
+#[abi]
+pub struct OrderView {
+    pub owner: Address,
+    pub is_buy: bool,
+    pub limit: u256,
+    pub quantity: u256,
+    pub owner_seq: u256,
+    pub locked: Wei,
+    pub filled: u256,
+    pub claimed: bool,
+}
+
+impl Copy for OrderView {}
+
+#[abi]
+pub struct BalancesView { pub base: u256, pub quote: Wei }
+
+impl Copy for BalancesView {}
+
+pub msg AnyOrderMsg {
+    #[selector = sol("depositEth()")]
+    DepositEth,
+    #[selector = sol("depositToken(uint256)")]
+    DepositToken { amount: u256 },
+    #[selector = sol("withdraw(uint256,uint256)")]
+    Withdraw { base: u256, quote: Wei },
+    #[selector = sol("placeBuy(uint256,uint256)")]
+    PlaceBuy { limit: u256, quantity: u256 } -> OrderRef,
+    #[selector = sol("placeSell(uint256,uint256)")]
+    PlaceSell { limit: u256, quantity: u256 } -> OrderRef,
+    #[selector = sol("clear(uint256)")]
+    Clear { batch: u256 } -> ClearingView,
+    #[selector = sol("claim(uint256,uint256)")]
+    Claim { batch: u256, index: u256 } -> Payout,
+    #[selector = sol("config()")]
+    Config -> ConfigView,
+    #[selector = sol("currentBatch()")]
+    CurrentBatch -> u256,
+    #[selector = sol("batchInfo(uint256)")]
+    BatchInfo { batch: u256 } -> BatchView,
+    #[selector = sol("orderAt(uint256,uint256)")]
+    OrderAt { batch: u256, index: u256 } -> OrderView,
+    #[selector = sol("preview(uint256)")]
+    Preview { batch: u256 } -> ClearingView,
+    #[selector = sol("balances(address)")]
+    Balances { owner: Address } -> BalancesView,
+}
+
+#[event]
+pub struct Deposited {
+    #[indexed]
+    pub owner: Address,
+    pub base: u256,
+    pub quote: Wei,
+}
+
+#[event]
+pub struct Withdrawn {
+    #[indexed]
+    pub owner: Address,
+    pub base: u256,
+    pub quote: Wei,
+}
+
+#[event]
+pub struct OrderPlaced {
+    #[indexed]
+    pub batch: u256,
+    #[indexed]
+    pub owner: Address,
+    pub index: u256,
+    pub is_buy: bool,
+    pub limit: u256,
+    pub quantity: u256,
+}
+
+#[event]
+pub struct BatchCleared {
+    #[indexed]
+    pub batch: u256,
+    pub traded: bool,
+    pub price: u256,
+    pub volume: u256,
+}
+
+#[event]
+pub struct Claimed {
+    #[indexed]
+    pub batch: u256,
+    #[indexed]
+    pub owner: Address,
+    pub index: u256,
+    pub base: u256,
+    pub quote: Wei,
+}
+
+#[error]
+pub struct ZeroAmount {}
+
+#[error]
+pub struct InsufficientFunds { pub available: u256, pub required: u256 }
+
+#[error]
+pub struct BelowMinimum { pub quantity: u256, pub minimum: u256 }
+
+#[error]
+pub struct AboveMaximum { pub quantity: u256, pub maximum: u256 }
+
+#[error]
+pub struct PriceOutOfRange { pub limit: u256, pub max_price: u256 }
+
+#[error]
+pub struct BatchFull { pub batch: u256, pub max_orders: u256 }
+
+#[error]
+pub struct BatchStillOpen { pub batch: u256, pub ends_at: u256 }
+
+#[error]
+pub struct AlreadyCleared { pub batch: u256 }
+
+#[error]
+pub struct NotCleared { pub batch: u256 }
+
+#[error]
+pub struct UnknownOrder { pub batch: u256, pub index: u256 }
+
+#[error]
+pub struct AlreadyClaimed { pub batch: u256, pub index: u256 }
+
+#[error]
+pub struct Reentrant {}
+
+#[error]
+pub struct TransferFailed {}

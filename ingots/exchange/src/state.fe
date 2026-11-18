@@ -1,0 +1,60 @@
+//! Storage as effects. Each handler names exactly the storage it touches.
+
+use std::evm::{StorageMap, TSlot}
+
+/// "Now", provided as an effect. `AnyOrder` builds it from the block
+/// timestamp; `AnyOrderTestClock` from a stored test time. Nothing else in
+/// the exchange reads the time.
+pub struct Clock { pub now: Timestamp }
+
+impl Copy for Clock {}
+
+/// Fixed at deployment.
+pub struct Settings {
+    pub token: Address,
+    pub genesis: Timestamp,
+    pub batch_length: Duration,
+    pub max_orders: u256,
+    pub min_quantity: u256,
+    pub max_price: u256,
+}
+
+/// One batch: how many orders it holds and, once cleared, its result.
+pub struct BatchSlot {
+    pub count: u256,
+    pub cleared: bool,
+    pub traded: bool,
+    pub price: u256,
+    pub volume: u256,
+}
+
+impl Copy for BatchSlot {}
+
+/// One order. A buy locks `locked` wei at its limit; a sell locks `quantity`
+/// base units. `filled` is written when the batch clears.
+pub struct OrderSlot {
+    pub owner: Address,
+    pub is_buy: bool,
+    pub limit: u256,
+    pub quantity: u256,
+    pub owner_seq: u256,
+    pub locked: Wei,
+    pub filled: u256,
+    pub claimed: bool,
+}
+
+impl Copy for OrderSlot {}
+
+/// Orders by batch and arrival index. The index only enumerates storage;
+/// clearing never reads it.
+pub struct Book {
+    pub batches: StorageMap<u256, BatchSlot>,
+    pub orders: StorageMap<(u256, u256), OrderSlot>,
+    pub seqs: StorageMap<Address, u256>,
+}
+
+/// Free (unlocked) balances: base tokens and wei.
+pub struct Funds { pub base: StorageMap<Address, u256>, pub quote: StorageMap<Address, Wei> }
+
+/// A transient-storage reentrancy lock for the payout path.
+pub struct Guard { pub entered: TSlot<bool> }
