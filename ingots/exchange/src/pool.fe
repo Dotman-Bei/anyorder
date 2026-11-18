@@ -1,0 +1,95 @@
+//! BASELINE FOR THE CONTRAST, not part of AnyOrder. A constant-product pool
+//! (x * y = k, no fee) whose output depends on transaction order, so a
+//! sandwich around a victim's buy pays. Pricing follows the Fe guide's DEX
+//! `quote` example (Apache-2.0), with no fee.
+
+use core::num::mul_div
+use std::abi::sol
+use std::evm::erc20
+
+#[abi]
+pub struct Reserves { pub token: u256, pub eth: Wei }
+
+impl Copy for Reserves {}
+
+pub msg PoolMsg {
+    #[selector = sol("seed(uint256)")]
+    Seed { token_amount: u256 },
+    #[selector = sol("buyTokens(uint256)")]
+    BuyTokens { min_out: u256 } -> u256,
+    #[selector = sol("sellTokens(uint256,uint256)")]
+    SellTokens { amount: u256, min_out: Wei } -> Wei,
+    #[selector = sol("reserves()")]
+    GetReserves -> Reserves,
+}
+
+pub struct PoolState { pub token: Address, pub token_reserve: u256, pub eth_reserve: Wei }
+
+pub contract ConstantProductPool uses (ctx: Ctx, call: mut Call) {
+    mut pool: PoolState,
+
+    init(token: Address) uses (mut pool) { pool.token = token }
+
+    recv PoolMsg {
+        #[payable]
+        Seed { token_amount } uses (ctx, mut call, mut pool) {
+            assert!(pool.token_reserve == 0, "already seeded")
+            assert!(
+                token_amount > 0 && ctx.value() > Wei::zero(),
+                "empty seed",
+            )
+            pool.token_reserve = token_amount
+            pool.eth_reserve = ctx.value()
+            erc20::safe_transfer_from(
+                token: pool.token,
+                owner: ctx.caller(),
+                receiver: ctx.address(),
+                amount: token_amount,
+            )
+        }
+
+        #[payable]
+        BuyTokens { min_out } -> u256 uses (ctx, mut call, mut pool) {
+            let eth_in = ctx.value()
+            assert!(eth_in > Wei::zero(), "no eth")
+            let out = mul_div(
+                eth_in.as_wei(),
+                pool.token_reserve,
+                pool.eth_reserve.as_wei() + eth_in.as_wei(),
+            )
+            assert!(out > 0 && out >= min_out, "slippage limit")
+            pool.eth_reserve = pool.eth_reserve + eth_in
+            pool.token_reserve = pool.token_reserve - out
+            erc20::safe_transfer(token: pool.token, receiver: ctx.caller(), amount: out)
+            out
+        }
+
+        SellTokens { amount, min_out } -> Wei uses (ctx, mut call, mut pool) {
+            assert!(amount > 0, "no tokens")
+            let out = pool
+                .eth_reserve
+                .mul_div(
+                    numerator: amount,
+                    denominator: pool.token_reserve + amount,
+                )
+            assert!(out > Wei::zero() && out >= min_out, "slippage limit")
+            pool.token_reserve = pool.token_reserve + amount
+            pool.eth_reserve = pool.eth_reserve - out
+            erc20::safe_transfer_from(
+                token: pool.token,
+                owner: ctx.caller(),
+                receiver: ctx.address(),
+                amount,
+            )
+            assert!(
+                call.send_value(addr: ctx.caller(), gas: 50000, value: out).success(),
+                "eth transfer failed",
+            )
+            out
+        }
+
+        GetReserves -> Reserves uses (pool) {
+            Reserves { token: pool.token_reserve, eth: pool.eth_reserve }
+        }
+    }
+}

@@ -3,4 +3,5 @@
 //! `AnyOrderTestClock`, `Trader` and `Reenterer` are test-only harnesses.
 
 pub use interface::*
+pub use pool::{ConstantProductPool, PoolMsg, Reserves}
 pub use token::{TestToken, TokenMsg}

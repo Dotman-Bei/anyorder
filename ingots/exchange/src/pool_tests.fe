@@ -1,0 +1,119 @@
+//! The baseline pool on its own: the constant-product formula and the fact
+//! that an immediate round trip never returns more than it cost.
+
+use core::num::mul_div
+use std::abi::sol
+use std::evm::{ether, wei}
+use ingot::pool::{ConstantProductPool, PoolMsg, Reserves}
+use ingot::token::{TestToken, TokenMsg}
+
+const SEED_TOKENS: u256 = 400_000_000_000_000_000_000
+
+fn seeded_pool() -> (Address, Address) uses (evm: mut Evm) {
+    let token = evm.create2<TestToken>(value: Wei::zero(), args: (), salt: 0)
+    let pool = evm.create2<ConstantProductPool>(value: Wei::zero(), args: (token,), salt: 1)
+    let minted: bool = evm
+        .call(
+            addr: token,
+            gas: 200000,
+            value: Wei::zero(),
+            message: TokenMsg::Mint { to: evm.address(), amount: SEED_TOKENS },
+        )
+    assert!(minted)
+    let approved: bool = evm
+        .call(
+            addr: token,
+            gas: 200000,
+            value: Wei::zero(),
+            message: TokenMsg::Approve { spender: pool, amount: SEED_TOKENS },
+        )
+    assert!(approved)
+    evm.call(
+        addr: pool,
+        gas: 300000,
+        value: wei(4_400_000_000_000_000_000),
+        message: PoolMsg::Seed { token_amount: SEED_TOKENS },
+    )
+    (token, pool)
+}
+
+#[test(balance = 10_000_000_000_000_000_000)]
+fn pool_buy_follows_the_constant_product_formula() uses (evm: mut Evm) {
+    let (_, pool) = seeded_pool()
+    let eth_in = 110_000_000_000_000_000
+    let out: u256 = evm
+        .call(
+            addr: pool,
+            gas: 300000,
+            value: wei(eth_in),
+            message: PoolMsg::BuyTokens { min_out: 0 },
+        )
+    assert!(
+        out == mul_div(eth_in, SEED_TOKENS, 4_400_000_000_000_000_000 + eth_in),
+    )
+    let r: Reserves = evm
+        .call(
+            addr: pool,
+            gas: 100000,
+            value: Wei::zero(),
+            message: PoolMsg::GetReserves {},
+        )
+    assert!(r.token == SEED_TOKENS - out)
+    assert!(r.eth == wei(4_400_000_000_000_000_000 + eth_in))
+}
+
+msg UserMsg {
+    #[selector = sol("roundTrip(address,address)")]
+    RoundTrip { pool: Address, token: Address } -> Wei,
+}
+
+/// TEST ONLY: buys with the ETH it is sent, then sells everything back, and
+/// can receive the ETH the pool pays out (the test runner cannot).
+pub contract PoolUser uses (ctx: Ctx, call: mut Call) {
+    recv UserMsg {
+        #[payable]
+        RoundTrip { pool, token } -> Wei uses (ctx, mut call) {
+            let out: u256 = call
+                .call(
+                    addr: pool,
+                    gas: 300000,
+                    value: ctx.value(),
+                    message: PoolMsg::BuyTokens { min_out: 0 },
+                )
+            let ok: bool = call
+                .call(
+                    addr: token,
+                    gas: 100000,
+                    value: Wei::zero(),
+                    message: TokenMsg::Approve { spender: pool, amount: out },
+                )
+            assert!(ok)
+            call.call(
+                addr: pool,
+                gas: 300000,
+                value: Wei::zero(),
+                message: PoolMsg::SellTokens { amount: out, min_out: Wei::zero() },
+            )
+        }
+    }
+
+    recv {
+        #[payable]
+        _ {}
+    }
+}
+
+#[test(balance = 10_000_000_000_000_000_000)]
+fn pool_round_trip_returns_no_more_than_it_cost() uses (evm: mut Evm) {
+    let (token, pool) = seeded_pool()
+    let user = evm.create2<PoolUser>(value: Wei::zero(), args: (), salt: 2)
+    let back: Wei = evm
+        .call(
+            addr: user,
+            gas: 1000000,
+            value: ether(1),
+            message: UserMsg::RoundTrip { pool, token },
+        )
+    assert!(back <= ether(1))
+    assert!(evm.balance(user) == back)
+}
