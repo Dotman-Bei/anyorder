@@ -18,7 +18,7 @@ repository root, not Git Bash. Other `Run:` lines are Git Bash. Cross-plan depen
 **Files:**
 - Modify: `README.md`
 
-**Depends on:** Task core:12, Task dapp:9
+**Depends on:** Task core:12, Task core:13, Task dapp:9
 **Effort:** medium
 **Provides:** `README.md (R2-contract-protocol v1 + event-overlay)`
 **Requires:** `web/public/recorded/sandwich.json (a real recorded run)`, `pnpm -C web local (Anvil 8545 + fe build + deploy + seed + Vite)`, `deploy/params.json { maxOrders, demoBatchSize, batchSeconds, minQuantity, maxPrice }`

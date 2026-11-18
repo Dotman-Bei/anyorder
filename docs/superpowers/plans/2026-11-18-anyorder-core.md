@@ -4549,6 +4549,8 @@ Message: `chore(core): freeze the ABI of AnyOrder, TestToken and the baseline po
 
 ### Task 11: Contract invariants: interleaving permutations, solvency, reentrancy
 
+> **Superseded in part by Task 13:** the reentrancy test and the `Reenterer` below pass even with the lock deleted; Task 13 replaces both and adds the mutation check.
+
 **Files:**
 - Test: `ingots/exchange/src/invariant_tests.fe`
 
@@ -5187,3 +5189,197 @@ Expected: PASS — `test result: ok. 6 passed; 0 failed`
 The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
 those paths with this message. The executor never runs git.
 Message: `test(core): sandwich contrast, pool vs batch, with exact asserted numbers`
+
+---
+
+### Task 13: Strengthen the reentrancy test so only the lock can refuse the re-entry
+
+**Files:**
+- Create: `scripts/mutant-reentrancy.sh`
+- Modify: `ingots/exchange/src/actors.fe`
+- Test: `ingots/exchange/src/invariant_tests.fe`
+
+**Depends on:** Task 11
+**Effort:** high
+**Model tier:** top
+**Provides:** `reentrancy_lock_refuses_a_second_withdraw (fails when the Reentrant check is deleted from withdraw)`, `bash scripts/mutant-reentrancy.sh -> last line MUTANT-REENTRANCY: OK (real contract passes, lock deleted fails)`
+**Requires:** `contract AnyOrder(token, genesis, batch_length, max_orders, min_quantity, max_price)`, `msg AnyOrderMsg + #[abi] views + events + errors (core spec section 8, ingot::interface)`, `contract Trader + msg TraderMsg, contract Reenterer + msg ReentererMsg (test only)`, `harness::{T, MILLI, MAX_PRICE, deploy_token, deploy_exchange, new_trader, fund_tokens, fund_eth, place_buy, place_sell, set_time, clear, claim, balances, batch_info, order_at, token_balance}`, `permutation_contract_interleavings_seed_7, permutation_contract_interleavings_seed_8, solvency_holds_after_every_step_of_a_seeded_run, reentrancy_lock_refuses_a_second_withdraw`
+
+- [ ] **Step 1: Context**
+Uses `contract AnyOrder(token, genesis, batch_length, max_orders, min_quantity, max_price)`, `msg AnyOrderMsg + #[abi] views + events + errors (core spec section 8, ingot::interface)`, `contract Trader + msg TraderMsg, contract Reenterer + msg ReentererMsg (test only)`, `harness::{T, MILLI, MAX_PRICE, deploy_token, deploy_exchange, new_trader, fund_tokens, fund_eth, place_buy, place_sell, set_time, clear, claim, balances, batch_info, order_at, token_balance}`, `permutation_contract_interleavings_seed_7, permutation_contract_interleavings_seed_8, solvency_holds_after_every_step_of_a_seeded_run, reentrancy_lock_refuses_a_second_withdraw`.
+Why this task exists: Task 11's `reentrancy_lock_refuses_a_second_withdraw` passes even with the `Reentrant` check deleted from `withdraw` in `ingots/exchange/src/logic.fe`. The hostile payee withdrew its whole balance, and `withdraw` zeroes the balance before it pays out, so the re-entry failed on `InsufficientFunds` with or without the lock. The fix has two parts, and both are needed. (a) The hostile deposits 2 ether, withdraws 1 and re-enters for the other 1, so the re-entry asks for funds it really holds. (b) The hostile re-enters **once**: Task 11's fallback re-enters on every payment it receives, so without the lock a successful re-entry would pay it again, re-enter a third time on an empty balance and revert the whole chain. With (a) alone the test still passes on the mutant (measured). The guard in `withdraw` that the mutant deletes is exactly these three lines:
+```fe
+    if guard.entered.value {
+        revert_error(Reentrant {})
+    }
+```
+Facts measured on fe 26.6.0 with this exact code: with the lock, the nested `withdraw` reverts `Reentrant()` (0xed3ba6a6), the hostile's fallback bubbles it, the payout fails and the outer withdrawal reverts `TransferFailed()` (0x90b8ec18). With the guard deleted, the re-entry succeeds under the same gas (the fallback's 40000 for the nested call, inside the exchange's fixed 50000 for `send_value`), and both ether leave the exchange. So the mutant fails the test on its first assertion, not on gas. Do not change any gas value below and do not touch `logic.fe`: the mutation check reads it.
+
+- [ ] **Step 2: Replace the Reenterer actor (TEST ONLY)**
+In `ingots/exchange/src/actors.fe`, replace everything from the line `pub msg ReentererMsg {` to the end of the file with exactly this content (the `Trader` actor above it stays byte for byte as it is):
+```fe
+pub msg ReentererMsg {
+    #[selector = sol("arm(address,uint256)")]
+    Arm { exchange: Address, quote: Wei },
+    #[selector = sol("pull(address,uint256)")]
+    Pull { exchange: Address, quote: Wei },
+}
+
+/// TEST ONLY. A hostile payee: the first time the exchange pays it ETH, its
+/// fallback calls `withdraw` again for `amount`, a sum it really holds, so
+/// only the transient lock can refuse the second entry. It re-enters once:
+/// the payout of a re-entry that got through is accepted without calling back.
+pub contract Reenterer uses (ctx: Ctx, call: mut Call) {
+    mut target: Address,
+    mut amount: Wei,
+
+    recv ReentererMsg {
+        #[payable]
+        Arm { exchange, quote } uses (ctx, mut call, mut target, mut amount) {
+            target = exchange
+            amount = quote
+            call.call(
+                addr: exchange,
+                gas: 100000,
+                value: ctx.value(),
+                message: AnyOrderMsg::DepositEth {},
+            )
+        }
+
+        Pull { exchange, quote } uses (mut call) {
+            call.call(
+                addr: exchange,
+                gas: 300000,
+                value: Wei::zero(),
+                message: AnyOrderMsg::Withdraw { base: 0, quote },
+            )
+        }
+    }
+
+    recv {
+        #[payable]
+        _ uses (mut call, target, mut amount) {
+            if amount > Wei::zero() {
+                let quote = amount
+                amount = Wei::zero()
+                call.call(
+                    addr: target,
+                    gas: 40000,
+                    value: Wei::zero(),
+                    message: AnyOrderMsg::Withdraw { base: 0, quote },
+                )
+            }
+        }
+    }
+}
+```
+
+- [ ] **Step 3: Replace the reentrancy test**
+In `ingots/exchange/src/invariant_tests.fe`, replace everything from the line `#[test(balance = 10_000_000_000_000_000_000)]` (the attribute directly above `fn reentrancy_lock_refuses_a_second_withdraw`, the only line in the file with that exact text) to the end of the file with exactly this content (the imports and the other tests stay byte for byte as they are):
+```fe
+#[test(balance = 10_000_000_000_000_000_000)]
+fn reentrancy_lock_refuses_a_second_withdraw() uses (evm: mut Evm) {
+    let token = deploy_token(salt: 0)
+    let exchange = deploy_exchange(token, max_orders: 16, salt: 1)
+    let hostile = evm.create2<Reenterer>(value: Wei::zero(), args: (), salt: 2)
+    // The hostile payee deposits 2 ether and will re-enter for 1 of them, so
+    // the second withdrawal is one its balance covers: only the lock can
+    // refuse it.
+    evm.call(
+        addr: hostile,
+        gas: 300000,
+        value: ether(2),
+        message: ReentererMsg::Arm { exchange, quote: ether(1) },
+    )
+    // Withdrawing 1 ether pays the hostile, whose fallback re-enters
+    // `withdraw` for the other 1 ether. The lock refuses it, so the payout
+    // fails and the whole withdrawal reverts. With the `Reentrant` check
+    // deleted the re-entry succeeds and both ether leave; the mutation check
+    // scripts/mutant-reentrancy.sh proves this test then fails.
+    let r = evm
+        .try_call(
+            addr: hostile,
+            gas: 1000000,
+            value: Wei::zero(),
+            message: ReentererMsg::Pull { exchange, quote: ether(1) },
+        )
+    assert!(!r.success())
+    assert!(balances(exchange, owner: hostile).quote == ether(2))
+    assert!(evm.balance(exchange) == ether(2))
+    assert!(evm.balance(hostile) == Wei::zero())
+}
+```
+
+- [ ] **Step 4: The mutation check**
+Write `scripts/mutant-reentrancy.sh` with exactly this content:
+```bash
+#!/usr/bin/env bash
+# Mutation check for the reentrancy lock (core spec section 10). Proves both
+# halves of the claim "the lock is test-covered":
+#   1. reentrancy_lock_refuses_a_second_withdraw passes on the real contract;
+#   2. in a temporary copy of the workspace with the `Reentrant` check deleted
+#      from `withdraw` in logic.fe, the same test fails on an assertion.
+# The copy lives in a fresh temp directory that is removed on exit. The
+# repository is only read, never modified, so there is nothing to restore.
+#
+#   bash scripts/mutant-reentrancy.sh
+#   last line: MUTANT-REENTRANCY: OK (real contract passes, lock deleted fails)
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEST=reentrancy_lock_refuses_a_second_withdraw
+LOGIC=ingots/exchange/src/logic.fe
+GUARD='    if guard.entered.value {'
+# What a failed `assert!` reverts with: Panic(uint256) code 0x01.
+ASSERT_PANIC=0x4e487b710000000000000000000000000000000000000000000000000000000000000001
+
+fail() {
+  echo "MUTANT-REENTRANCY: FAIL ($1)"
+  exit 1
+}
+
+# Half 1: the real contract.
+real="$(cd "${ROOT}" && fe test --filter "${TEST}" 2>&1)" || true
+if ! grep -qF "test result: ok. 1 passed; 0 failed" <<< "${real}"; then
+  echo "${real}"
+  fail "the test does not pass on the real contract"
+fi
+echo "real contract: ${TEST} passes"
+
+# Half 2: a temporary copy with the lock check deleted.
+TMP="$(mktemp -d)"
+trap 'rm -rf "${TMP}"' EXIT
+cp "${ROOT}/fe.toml" "${TMP}/fe.toml"
+cp -R "${ROOT}/ingots" "${TMP}/ingots"
+[[ "$(grep -cxF "${GUARD}" "${TMP}/${LOGIC}")" -eq 1 ]] \
+  || fail "the guard line was not found exactly once in ${LOGIC}"
+# Delete the guard: the `if` line, `revert_error(Reentrant {})` and the `}`.
+sed -i "/^${GUARD}\$/,+2d" "${TMP}/${LOGIC}"
+[[ "$(grep -c 'revert_error(Reentrant {})' "${TMP}/${LOGIC}")" -eq 0 ]] \
+  || fail "the mutation did not remove the Reentrant check"
+[[ "$(diff "${ROOT}/${LOGIC}" "${TMP}/${LOGIC}" | grep -c '^<')" -eq 3 ]] \
+  || fail "the mutation did not remove exactly three lines"
+echo "mutant: Reentrant check deleted from withdraw in a temp copy"
+
+mutant="$(cd "${TMP}" && fe test --filter "${TEST}" 2>&1)" || true
+if ! grep -qF "test result: FAILED. 0 passed; 1 failed" <<< "${mutant}"; then
+  echo "${mutant}"
+  fail "the test still passes with the lock deleted"
+fi
+if ! grep -qF "Test reverted: ${ASSERT_PANIC}" <<< "${mutant}"; then
+  echo "${mutant}"
+  fail "the mutant failed, but not on an assertion"
+fi
+echo "mutant: ${TEST} fails on an assertion"
+echo "MUTANT-REENTRANCY: OK (real contract passes, lock deleted fails)"
+```
+
+- [ ] **Step 5: Format, every exchange test, then both halves of the mutation check**
+Run: `fe fmt --check ingots/exchange && fe test ingots/exchange && bash scripts/mutant-reentrancy.sh`
+Expected: PASS — `MUTANT-REENTRANCY: OK (real contract passes, lock deleted fails)`
+(The `fe test ingots/exchange` summary before it reads `test result: ok. 24 passed; 0 failed` with Task 12 built. The script fails with `MUTANT-REENTRANCY: FAIL (...)` and exit 1 if the test fails on the real contract, if it still passes with the guard deleted, or if the mutant fails on anything other than an `assert!`.)
+
+- [ ] **Step 6: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `test(core): only the lock can refuse the re-entry, proven by a mutation check`

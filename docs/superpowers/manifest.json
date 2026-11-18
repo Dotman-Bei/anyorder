@@ -479,6 +479,47 @@
       "status": "pending"
     },
     {
+      "id": "core:13",
+      "subsystem": "core",
+      "title": "Strengthen the reentrancy test so only the lock can refuse the re-entry",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-core.md",
+      "depends_on": [
+        "core:11"
+      ],
+      "effort": "high",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "scripts/mutant-reentrancy.sh"
+        ],
+        "modify": [
+          "ingots/exchange/src/actors.fe"
+        ],
+        "test": [
+          "ingots/exchange/src/invariant_tests.fe"
+        ]
+      },
+      "provides": [
+        "reentrancy_lock_refuses_a_second_withdraw (fails when the Reentrant check is deleted from withdraw)",
+        "bash scripts/mutant-reentrancy.sh -> last line MUTANT-REENTRANCY: OK (real contract passes, lock deleted fails)"
+      ],
+      "requires": [
+        "contract AnyOrder(token, genesis, batch_length, max_orders, min_quantity, max_price)",
+        "msg AnyOrderMsg + #[abi] views + events + errors (core spec section 8, ingot::interface)",
+        "contract Trader + msg TraderMsg, contract Reenterer + msg ReentererMsg (test only)",
+        "harness::{T, MILLI, MAX_PRICE, deploy_token, deploy_exchange, new_trader, fund_tokens, fund_eth, place_buy, place_sell, set_time, clear, claim, balances, batch_info, order_at, token_balance}",
+        "permutation_contract_interleavings_seed_7, permutation_contract_interleavings_seed_8, solvency_holds_after_every_step_of_a_seeded_run, reentrancy_lock_refuses_a_second_withdraw"
+      ],
+      "gate": {
+        "run": "fe fmt --check ingots/exchange && fe test ingots/exchange && bash scripts/mutant-reentrancy.sh",
+        "expect": "MUTANT-REENTRANCY: OK (real contract passes, lock deleted fails)"
+      },
+      "commit": "test(core): only the lock can refuse the re-entry, proven by a mutation check",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
       "id": "dapp:1",
       "subsystem": "dapp",
       "title": "Web scaffold: pinned toolchain, two-page Vite build, formatters that never show unknown as zero",
@@ -913,6 +954,7 @@
       "plan": "docs/superpowers/plans/2026-11-18-anyorder-docs.md",
       "depends_on": [
         "core:12",
+        "core:13",
         "dapp:9"
       ],
       "effort": "medium",

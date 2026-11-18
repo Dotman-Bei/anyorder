@@ -267,8 +267,8 @@ The ABI JSON of all three is frozen in `abi/` by A task 10.
 | `permutation_contract_interleavings_seed_7` / `_seed_8` | **contract level:** 2 × 128 seeded shuffles of the interleaving **across owners, each owner's own order sequence fixed**; compares price and per-owner balances after all claims |
 | `sandwich_*` (4) | §6 |
 | `solvency_holds_after_every_step_of_a_seeded_run` | after every placement, clearing and claim, holdings cover free balances plus every unclaimed lock or payout; after full withdrawal tokens are exactly 0 and only dust wei remain |
-| `reentrancy_lock_refuses_a_second_withdraw` | a payee re-entering `withdraw` makes the withdrawal revert |
-| `lifecycle_*`, `revert_*` (13) | the full lifecycle (test clock) and the production contract's open phase; 10 of the 13 custom errors by exact selector (`Reentrant` and `TransferFailed` are covered by the reentrancy test, where the outer withdrawal reverts; `AboveMaximum` guards quantities above 10^30 base units and is not exercised) |
+| `reentrancy_lock_refuses_a_second_withdraw` (plan Task core:13) | the transient lock, and only the lock, refuses a re-entered `withdraw`. A hostile payee deposits 2 ether and withdraws 1; its fallback re-enters `withdraw` once for the other 1, a sum its balance covers. The re-entry reverts, so the payout fails and the outer withdrawal reverts; the exchange still holds 2 ether and the payee's balance is still 2 ether. **Mutation check:** `scripts/mutant-reentrancy.sh` deletes the `Reentrant` check from `withdraw` in a temp copy, and the test then fails on an assertion: the re-entry succeeds under the same gas and both ether leave. So the test cannot pass without the lock. It exercises the ETH payout; the token payout relies on §11 (7) |
+| `lifecycle_*`, `revert_*` (13) | the full lifecycle (test clock) and the production contract's open phase; 10 of the 13 custom errors by exact selector (`Reentrant` and `TransferFailed` are exercised by the reentrancy test but not asserted by selector: the re-entry reverts `Reentrant`, which makes the payout fail and the outer withdrawal revert `TransferFailed`; `AboveMaximum` guards quantities above 10^30 base units and is not exercised) |
 | `token_*` | the ERC20 and the proxy-actor pattern |
 
 Property tests are seeded (`KeccakRng::seeded(n)`) and hand-rolled; a failure replays exactly.
@@ -280,8 +280,11 @@ books: rule = oracle, the lemma, condition C).
 The brief's ten, kept: (1) the batch removes ordering, not market power or strategic placement;
 (2) builders can censor; (3) timestamps skew within a batch boundary; (4) DoS bounded by
 `maxOrders` (measured) and `minQuantity`; (5) rounding favours the contract, solvency is a test;
-(6) state final before external calls plus a `TSlot` lock; (7) standard ERC20 only; (8) key domains
-validated explicitly; (9) no oracle, a thin batch can clear far from outside prices; (10) prototype.
+(6) state final before external calls, plus a transient `TSlot` lock on `withdraw`, the only function
+that pays out. The lock is test-covered: a payee re-entering `withdraw` for funds it really holds is
+refused, and the test fails when the `Reentrant` check is deleted (`scripts/mutant-reentrancy.sh`,
+§10). The test exercises the ETH payout; the token payout relies on (7). (7) standard ERC20 only;
+(8) key domains validated explicitly; (9) no oracle, a thin batch can clear far from outside prices; (10) prototype.
 Added: (11) **batch-filling griefing**: anyone can fill a batch's `maxOrders` slots with minimum
 orders, costing them only locked capital; per-address caps are Sybil-able, so it is stated, not
 solved; (12) the owner-address tie-break (§5 wording); (13) `AnyOrderTestClock` exists only for
