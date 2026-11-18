@@ -1,0 +1,114 @@
+use core::ops::{Eq, Ord}
+use core::ptr::MemVec
+use ingot::types::{Clearing, Order}
+
+// A marginal order's claim on the rationing remainder. Sorting puts the order
+// that gets the next leftover unit first: the largest fractional remainder,
+// then the larger quantity, then the lower owner, then that owner's earlier
+// order.
+struct Rank { index: usize, remainder: u256, quantity: u256, owner: u256, owner_seq: u256 }
+
+impl Copy for Rank {}
+
+impl Eq for Rank {
+    fn eq(self, _ other: Rank) -> bool {
+        self.remainder == other.remainder
+            && self.quantity == other.quantity
+            && self.owner == other.owner
+            && self.owner_seq == other.owner_seq
+    }
+}
+
+impl Ord for Rank {
+    fn lt(self, _ other: Rank) -> bool {
+        if self.remainder != other.remainder {
+            return self.remainder > other.remainder
+        }
+        if self.quantity != other.quantity {
+            return self.quantity > other.quantity
+        }
+        if self.owner != other.owner {
+            return self.owner < other.owner
+        }
+        self.owner_seq < other.owner_seq
+    }
+    fn le(self, _ other: Rank) -> bool {
+        !other.lt(self)
+    }
+    fn gt(self, _ other: Rank) -> bool {
+        other.lt(self)
+    }
+    fn ge(self, _ other: Rank) -> bool {
+        !self.lt(other)
+    }
+}
+
+/// The filled quantity of every order, in the order of `orders`, at the price
+/// `clearing` chose. Orders strictly better than the price, and every order of
+/// the short side that can trade, fill in full. Only the long side's orders at
+/// exactly the price are rationed: pro rata by quantity, rounded down, with the
+/// leftover units handed out one each in `Rank` order.
+pub fn allocate(_ orders: MemVec<Order>, _ clearing: Clearing) -> MemVec<u256> {
+    var fills = MemVec<u256>::new()
+    if !clearing.traded {
+        for _ in orders {
+            fills.push(0)
+        }
+        return fills
+    }
+    let p = clearing.price
+    let buyers_long = clearing.demand >= clearing.supply
+    let excess = if buyers_long {
+        clearing.demand - clearing.supply
+    } else {
+        clearing.supply - clearing.demand
+    }
+
+    var marginal: u256 = 0
+    for o in orders {
+        if o.is_buy == buyers_long && o.limit == p {
+            marginal += o.quantity
+        }
+    }
+    // The selection rule guarantees marginal >= excess: the orders strictly
+    // better than the price always fit. Checked arithmetic reverts otherwise.
+    let share = marginal - excess
+
+    var ranks = MemVec<Rank>::new()
+    var handed: u256 = 0
+    var index: usize = 0
+    for o in orders {
+        var fill: u256 = 0
+        let long_side = o.is_buy == buyers_long
+        let better = if o.is_buy { o.limit > p } else { o.limit < p }
+        if better || (o.limit == p && !long_side) {
+            fill = o.quantity
+        } else if o.limit == p {
+            fill = o.quantity * share / marginal
+            handed += fill
+            ranks
+                .push(
+                    Rank {
+                        index,
+                        remainder: o.quantity * share % marginal,
+                        quantity: o.quantity,
+                        owner: o.owner,
+                        owner_seq: o.owner_seq,
+                    },
+                )
+        }
+        fills.push(fill)
+        index += 1
+    }
+
+    ranks.sort()
+    var leftover = share - handed
+    var k: usize = 0
+    while leftover > 0 {
+        let at = ranks[k].index
+        fills.set(at, fills[at] + 1)
+        leftover -= 1
+        k += 1
+    }
+    fills
+}

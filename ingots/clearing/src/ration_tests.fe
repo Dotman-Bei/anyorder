@@ -1,0 +1,60 @@
+use core::ptr::MemVec
+use ingot::{Order, allocate, select_price}
+
+fn o(_ is_buy: bool, _ limit: u256, _ quantity: u256, _ owner: u256, _ owner_seq: u256) -> Order {
+    Order { is_buy, limit, quantity, owner, owner_seq }
+}
+
+#[test]
+fn ration_marginal_buys_share_pro_rata_and_the_largest_remainder_gets_the_leftover() {
+    var book = MemVec<Order>::new()
+    book.push(o(false, 8, 10, 4, 0))
+    book.push(o(true, 9, 7, 1, 0))
+    book.push(o(true, 9, 5, 2, 0))
+    book.push(o(true, 9, 3, 3, 0))
+    let fills = allocate(book, select_price(book))
+    // 10 units for 15 wanted: 4.67, 3.33, 2.00 -> 4, 3, 2, and the leftover unit to 7's remainder.
+    assert!(
+        fills[0] == 10 && fills[1] == 5 && fills[2] == 3 && fills[3] == 2,
+    )
+}
+
+#[test]
+fn ration_equal_remainders_go_to_the_lower_owner() {
+    var book = MemVec<Order>::new()
+    book.push(o(false, 5, 2, 8, 0))
+    book.push(o(true, 5, 1, 9, 0))
+    book.push(o(true, 5, 1, 4, 0))
+    book.push(o(true, 5, 1, 7, 0))
+    let fills = allocate(book, select_price(book))
+    assert!(fills[1] == 0 && fills[2] == 1 && fills[3] == 1)
+}
+
+#[test]
+fn ration_one_owners_identical_orders_go_by_its_own_sequence() {
+    var book = MemVec<Order>::new()
+    book.push(o(false, 5, 1, 8, 0))
+    book.push(o(true, 5, 1, 3, 1))
+    book.push(o(true, 5, 1, 3, 0))
+    let fills = allocate(book, select_price(book))
+    assert!(fills[1] == 0 && fills[2] == 1)
+}
+
+#[test]
+fn ration_strictly_better_and_short_side_fill_in_full() {
+    var book = MemVec<Order>::new()
+    book.push(o(true, 12, 10, 1, 0))
+    book.push(o(false, 8, 3, 2, 0))
+    book.push(o(false, 10, 3, 3, 0))
+    let fills = allocate(book, select_price(book))
+    assert!(fills[0] == 6 && fills[1] == 3 && fills[2] == 3)
+}
+
+#[test]
+fn ration_no_trade_fills_nothing() {
+    var book = MemVec<Order>::new()
+    book.push(o(true, 7, 5, 1, 0))
+    book.push(o(false, 9, 5, 2, 0))
+    let fills = allocate(book, select_price(book))
+    assert!(fills.len() == 2 && fills[0] == 0 && fills[1] == 0)
+}

@@ -9,3 +9,4 @@
 pub use types::{Clearing, Order, UNIT, MAX_QUANTITY}
 pub use money::{cost_ceil, proceeds_floor}
 pub use select::select_price
+pub use ration::allocate
