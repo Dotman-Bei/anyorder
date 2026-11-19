@@ -20,10 +20,11 @@ function Invoke-Step([string]$Display, [scriptblock]$Do, [int]$Hold) {
     Write-Host ''
 }
 
-Invoke-Step 'fe test --filter sandwich' { cmd /c 'fe test --filter sandwich 2>&1'; $script:ec = $LASTEXITCODE } 4
-Invoke-Step 'fe test --filter permutation' { cmd /c 'fe test --filter permutation 2>&1'; $script:ec = $LASTEXITCODE } 4
+# Order and holds follow the narration: the sandwich run, the asserted figure, then permutation.
+Invoke-Step 'fe test --filter sandwich' { cmd /c 'fe test --filter sandwich 2>&1'; $script:ec = $LASTEXITCODE } 1
 Invoke-Step 'grep -n "== 8_090_638_930_163_447" ingots/exchange/src/sandwich_tests.fe' {
     & 'C:\Program Files\Git\usr\bin\grep.exe' -n '== 8_090_638_930_163_447' ingots/exchange/src/sandwich_tests.fe; $script:ec = $LASTEXITCODE
-} 7
+} 19
+Invoke-Step 'fe test --filter permutation' { cmd /c 'fe test --filter permutation 2>&1'; $script:ec = $LASTEXITCODE } 7
 New-Item -ItemType File -Path $Done -Force | Out-Null
 Start-Sleep -Seconds 2

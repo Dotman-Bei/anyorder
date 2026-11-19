@@ -48,7 +48,7 @@ Criteria and weights are quoted from the pack's `event.md`. The seconds are the 
 |---|---|---|---|---|---|---|---|---|
 | S1 | 10 | `/` landing hero, no clicks; the pitch sentence as an overlay card, the badge on | S1 "This is AnyOrder…" | screencast | — | `/` returned 200; hero heading visible; the page is not in the unavailable or error state | 3 | 1 |
 | S2 | 12 | `/` the sandwich-contrast section scrolled into view; the page's own "Recorded on a local Anvil chain" label stays in frame | S2 "On a constant-product…" | screencast | — | the recorded label and the recorded pool profit figure (as the page formats `web/public/recorded/sandwich.json`) are in the final frame | 3 | 1 |
-| S3 | 32 | terminal window, runner script: `fe test --filter sandwich`, `fe test --filter permutation`, then `grep -n "== 8_090_638_930_163_447" ingots/exchange/src/sandwich_tests.fe` — real output, nothing typed for show; idle compile waits may be time-ramped and labelled | S3 "Here is the…" | gfxcapture | — | the run's tee'd log contains `test result: ok. 6 passed; 0 failed`, `test result: ok. 3 passed; 0 failed` and the one grep hit (line 117, the profit assertion); every exit code 0; first frame shows no username | 3 | 1 |
+| S3 | 32 | terminal window, runner script, in the order the voice follows: `fe test --filter sandwich`, then `grep -n "== 8_090_638_930_163_447" ingots/exchange/src/sandwich_tests.fe`, then `fe test --filter permutation` — real output, nothing typed for show; the compile wait is sped up 2x and labelled; an overlay card (labelled as overlay text) restates the asserted figures from the README table | S3 "Here is the…" | gfxcapture | — | the run's tee'd log contains `test result: ok. 6 passed; 0 failed`, `test result: ok. 3 passed; 0 failed` and the one grep hit (line 117, the profit assertion), in that order; every exit code 0; first frame shows no username | 3 | 1 |
 | S4 | 25 | `/app` `#sandwich` scrolled through the three chapters, the recorded side-by-side, then click "Run the sandwich on your local chain" | S4 "Now the same…" | screencast | — | the live result's batch price is 0.011 alone and sandwiched, the victim's fill is unchanged, the attacker shows 0 tokens and −1 wei; the status line shows no error; `batchInfo` read back with `cast` is unchanged (snapshot rolled back) | 3 | 1 |
 | S5 | 14 | `/app` `#sandwich` "Where the guarantee stops" panel held in frame | S5 "This panel is…" | screencast | — | the panel's text includes "Where the guarantee stops" and "condition C" and the one-sided price 0.012, fully inside the viewport | 3 | 2 |
 | S6 | 22 | `/app` `#trade`: pick a built-in trader, place a buy into the open batch; `#settle`: click "Advance time to close the batch (dev chain control)", click "Clear batch N", click a trader's "Claim" | S6 "Now the lifecycle…" | screencast | — | each of the four transactions shows confirmed with no revert; the order appears in `#book`; the batch reads closed, then cleared at a price read from the contract; the claimed row reads Claimed; `cast call batchInfo` agrees | 3 | 1 |
@@ -88,6 +88,7 @@ Order: S1 (the title overlay is the pitch sentence, 0 extra seconds) → S2 → 
 Notes for approval, kept inside this section because the schema allows no extra headings:
 - **Toolchain bootstrap downloads** (needed by the stack, none done yet; asking for a yes with this script): Playwright's Chromium into a cache (~170 MB), Remotion's Chrome Headless Shell into `demo/node_modules` (~100 MB), the Kokoro Python packages with PyTorch and the Kokoro model from Hugging Face (about 1 GB in total, into a Python 3.12 venv outside the repo). If `espeak-ng` is not bundled by the Kokoro dependencies, its Windows installer is a system install, which I will ask about separately.
 - **Honest wording rules the narration follows:** the terminal prints PASS lines, not the ETH figures, so S3 says "the test source asserts", and the figures come from a real `grep` of that source; the S2/S4 side-by-side is a recording and says so; the live run in S4 is a real transaction sequence inside rolled-back Anvil snapshots; the book is seeded and S8 says so; nothing says sandwiches are impossible or solved.
+- **Assembly choices made after approval (all disclosed on screen or here):** Kokoro speaks every scene at 1.05x except S3 (1.0x, so the numbers land); the corner badge moved to a bottom strip because the top-right position covered the app's own nav button; S6 and the S3 compile wait are sped up and carry a "Sped up" label; where the voice outlasts the footage the last real frame is held (S3, S4, S5, S6); S5 and S7 use slow zooms for legibility; S3 shows an overlay card of the asserted figures (from the README table) because the terminal prints test names and one figure, not 0.011, 0.165 ETH or -1 wei.
 - **Recording is real or it is a placeholder card:** a scene that will not pass its gate after its retakes becomes a labelled BLOCKED card and is reported, never staged.
 - **The pronunciation of "Fe"** is chosen by ear: listen to the first S1 render, pick the reading that sounds most natural, and use that one everywhere. No pronunciation is stated as correct anywhere in the video or the publish copy.
 - **Approval notes (user, 2026-11-19):** S3 may run past 32 s so the numbers can land (audio-first timing decides; a total up to about 2:45 is fine); S7 keeps "cannot read the clock, a caller or storage" exactly and never says clearing cannot know who the traders are; the closing card shows `github.com/Dotman-Bei/anyorder` as text, no QR; the toolchain downloads are approved; an `espeak-ng` system installer, if one is needed, is asked about separately before installing.
@@ -96,14 +97,14 @@ Notes for approval, kept inside this section because the schema allows no extra 
 
 | check | scene(s) | pass/fail | note |
 |---|---|---|---|
-| money shot visible | | | |
-| text legible at 1080p | | | |
-| captions present + synced | | | |
-| no capture yellow border | | | |
-| no secret / no address that shouldn't be on screen | | | |
-| per-scene duration within budget | | | |
-| total duration within ±10% | | | |
-| audio present, loudness sane | | | |
+| money shot visible | S3, S4 | pass | S3 shows both fe test runs with real output and the figures card (0.011, 15 TKN for 0.165 ETH, 0 TKN and -1 wei); S4 shows the live run result on the real chain |
+| text legible at 1080p | all | pass | terminal text is 22 px effective after the 0.8 scale; the S7 code excerpt is zoomed (1.55x) while narrated; S5 is zoomed (1.45x) on the guarantee panel |
+| captions present + synced | all | pass | word-timed from the Kokoro timestamps; spot-checked S1, S3, S5, S7, S8 against the spoken words |
+| no capture yellow border | S3 | pass | window capture is the client area only; no border in any sampled frame |
+| no secret / no address that shouldn't be on screen | all | pass | sampled 13 frames across all scenes plus every S3 text log: no username, email, submission code, private link or account page; terminal paths read C:nyorder-demo; no wallet address is shown |
+| per-scene duration within budget | all | pass | audio-first: S1 11.6, S2 10.9, S3 43.0, S4 25.0, S5 18.3, S6 21.7, S7 21.4, S8 12.2 s; S3 is the longest as approved, S6 trimmed from 36 s by labelled speed-ups |
+| total duration within ±10% | all | pass | 2:44 (164.2 s) against the approved 2:30 plus the user's allowance up to about 2:45; it is 9% over 2:30 |
+| audio present, loudness sane | all | pass | integrated -14.06 LUFS, true peak -1.35 dBTP, no silence over 2 s |
 
 ## 7 — Publish block
 
@@ -127,3 +128,5 @@ Notes for approval, kept inside this section because the schema allows no extra 
 | 2026-11-19 | superseded-edit (S3: the grep pattern is `== 8_090_638_930_163_447` so the single hit is the profit assertion, line 117; the terminal runs in a clean clone `C:nyorder-demo` instead of a subst drive; S6's live capture is about 36 s, so audio-first timing and trims apply) | demo-studio |
 | 2026-11-19 | pre-flight verified | demo-studio |
 | 2026-11-19 | recorded (8/8 scenes; S5 retaken once because the pointer covered a figure) | demo-studio |
+| 2026-11-19 | assembled | demo-studio |
+| 2026-11-19 | QC passed [residuals: the captions' wording follows Kokoro's reading of the numbers; S3 and S6 contain labelled speed-ups and held frames; the Fe pronunciation could not be auditioned by the studio and is consistent across scenes] | demo-studio |

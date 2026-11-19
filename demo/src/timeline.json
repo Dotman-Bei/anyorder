@@ -1,0 +1,2038 @@
+{
+ "total": 164.1,
+ "scenes": [
+  {
+   "id": "S1",
+   "start": 0,
+   "dur": 11.6,
+   "lead": 0.2,
+   "narr": 11.065,
+   "width": 1920,
+   "height": 1080,
+   "pills": [],
+   "words": [
+    {
+     "text": "This",
+     "start": 0.5,
+     "end": 0.725
+    },
+    {
+     "text": "is",
+     "start": 0.725,
+     "end": 0.875
+    },
+    {
+     "text": "AnyOrder.",
+     "start": 0.875,
+     "end": 1.875
+    },
+    {
+     "text": "A",
+     "start": 2.345,
+     "end": 2.432
+    },
+    {
+     "text": "uniform-price",
+     "start": 2.432,
+     "end": 3.17
+    },
+    {
+     "text": "batch-auction",
+     "start": 3.17,
+     "end": 4.12
+    },
+    {
+     "text": "exchange",
+     "start": 4.12,
+     "end": 4.72
+    },
+    {
+     "text": "in",
+     "start": 4.72,
+     "end": 4.895
+    },
+    {
+     "text": "Fe",
+     "start": 4.895,
+     "end": 5.32
+    },
+    {
+     "text": "whose",
+     "start": 5.32,
+     "end": 5.557
+    },
+    {
+     "text": "fills",
+     "start": 5.557,
+     "end": 5.92
+    },
+    {
+     "text": "are",
+     "start": 5.92,
+     "end": 6.045
+    },
+    {
+     "text": "independent",
+     "start": 6.045,
+     "end": 6.657
+    },
+    {
+     "text": "of",
+     "start": 6.657,
+     "end": 6.745
+    },
+    {
+     "text": "transaction",
+     "start": 6.745,
+     "end": 7.395
+    },
+    {
+     "text": "order,",
+     "start": 7.395,
+     "end": 8.182
+    },
+    {
+     "text": "so",
+     "start": 8.182,
+     "end": 8.333
+    },
+    {
+     "text": "a",
+     "start": 8.333,
+     "end": 8.432
+    },
+    {
+     "text": "sandwich",
+     "start": 8.432,
+     "end": 9.02
+    },
+    {
+     "text": "has",
+     "start": 9.02,
+     "end": 9.233
+    },
+    {
+     "text": "no",
+     "start": 9.233,
+     "end": 9.507
+    },
+    {
+     "text": "ordering",
+     "start": 9.507,
+     "end": 9.97
+    },
+    {
+     "text": "to",
+     "start": 9.97,
+     "end": 10.12
+    },
+    {
+     "text": "exploit.",
+     "start": 10.12,
+     "end": 11.045
+    }
+   ]
+  },
+  {
+   "id": "S2",
+   "start": 11.6,
+   "dur": 10.9,
+   "lead": 0.2,
+   "narr": 10.34,
+   "width": 1920,
+   "height": 1080,
+   "pills": [],
+   "words": [
+    {
+     "text": "On",
+     "start": 0.45,
+     "end": 0.562
+    },
+    {
+     "text": "a",
+     "start": 0.562,
+     "end": 0.625
+    },
+    {
+     "text": "constant-product",
+     "start": 0.625,
+     "end": 1.5
+    },
+    {
+     "text": "pool,",
+     "start": 1.5,
+     "end": 2.15
+    },
+    {
+     "text": "the",
+     "start": 2.15,
+     "end": 2.3
+    },
+    {
+     "text": "order",
+     "start": 2.3,
+     "end": 2.562
+    },
+    {
+     "text": "of",
+     "start": 2.562,
+     "end": 2.65
+    },
+    {
+     "text": "transactions",
+     "start": 2.65,
+     "end": 3.463
+    },
+    {
+     "text": "sets",
+     "start": 3.463,
+     "end": 3.713
+    },
+    {
+     "text": "your",
+     "start": 3.713,
+     "end": 3.825
+    },
+    {
+     "text": "price.",
+     "start": 3.825,
+     "end": 4.6
+    },
+    {
+     "text": "A",
+     "start": 5.07,
+     "end": 5.158
+    },
+    {
+     "text": "searcher",
+     "start": 5.158,
+     "end": 5.52
+    },
+    {
+     "text": "buys",
+     "start": 5.52,
+     "end": 5.958
+    },
+    {
+     "text": "just",
+     "start": 5.958,
+     "end": 6.22
+    },
+    {
+     "text": "before",
+     "start": 6.22,
+     "end": 6.508
+    },
+    {
+     "text": "your",
+     "start": 6.508,
+     "end": 6.62
+    },
+    {
+     "text": "trade",
+     "start": 6.62,
+     "end": 6.983
+    },
+    {
+     "text": "and",
+     "start": 6.983,
+     "end": 7.108
+    },
+    {
+     "text": "sells",
+     "start": 7.108,
+     "end": 7.495
+    },
+    {
+     "text": "just",
+     "start": 7.495,
+     "end": 7.72
+    },
+    {
+     "text": "after",
+     "start": 7.72,
+     "end": 8.07
+    },
+    {
+     "text": "it,",
+     "start": 8.07,
+     "end": 8.545
+    },
+    {
+     "text": "and",
+     "start": 8.545,
+     "end": 8.67
+    },
+    {
+     "text": "keeps",
+     "start": 8.67,
+     "end": 8.958
+    },
+    {
+     "text": "what",
+     "start": 8.958,
+     "end": 9.083
+    },
+    {
+     "text": "your",
+     "start": 9.083,
+     "end": 9.195
+    },
+    {
+     "text": "trade",
+     "start": 9.195,
+     "end": 9.545
+    },
+    {
+     "text": "moved.",
+     "start": 9.545,
+     "end": 10.32
+    }
+   ]
+  },
+  {
+   "id": "S3",
+   "start": 22.5,
+   "dur": 43,
+   "lead": 0.2,
+   "narr": 42.575,
+   "width": 1792,
+   "height": 972,
+   "pills": [
+    {
+     "from": 3.6,
+     "to": 6.85,
+     "text": "Sped up 2x"
+    }
+   ],
+   "words": [
+    {
+     "text": "Here",
+     "start": 0.475,
+     "end": 0.75
+    },
+    {
+     "text": "is",
+     "start": 0.75,
+     "end": 0.888
+    },
+    {
+     "text": "the",
+     "start": 0.888,
+     "end": 1.025
+    },
+    {
+     "text": "evidence,",
+     "start": 1.025,
+     "end": 1.775
+    },
+    {
+     "text": "on",
+     "start": 1.775,
+     "end": 1.912
+    },
+    {
+     "text": "the",
+     "start": 1.912,
+     "end": 2
+    },
+    {
+     "text": "real",
+     "start": 2,
+     "end": 2.275
+    },
+    {
+     "text": "compiler.",
+     "start": 2.275,
+     "end": 3.225
+    },
+    {
+     "text": "fe",
+     "start": 3.745,
+     "end": 3.92
+    },
+    {
+     "text": "test,",
+     "start": 3.92,
+     "end": 4.395
+    },
+    {
+     "text": "filter",
+     "start": 4.395,
+     "end": 4.745
+    },
+    {
+     "text": "sandwich:",
+     "start": 4.745,
+     "end": 5.695
+    },
+    {
+     "text": "six",
+     "start": 6.265,
+     "end": 6.515
+    },
+    {
+     "text": "tests",
+     "start": 6.515,
+     "end": 6.865
+    },
+    {
+     "text": "pass.",
+     "start": 6.865,
+     "end": 7.69
+    },
+    {
+     "text": "The",
+     "start": 8.16,
+     "end": 8.235
+    },
+    {
+     "text": "test",
+     "start": 8.235,
+     "end": 8.535
+    },
+    {
+     "text": "source",
+     "start": 8.535,
+     "end": 8.835
+    },
+    {
+     "text": "asserts",
+     "start": 8.835,
+     "end": 9.248
+    },
+    {
+     "text": "that",
+     "start": 9.248,
+     "end": 9.348
+    },
+    {
+     "text": "a",
+     "start": 9.348,
+     "end": 9.423
+    },
+    {
+     "text": "pool",
+     "start": 9.423,
+     "end": 9.71
+    },
+    {
+     "text": "sandwich",
+     "start": 9.71,
+     "end": 10.198
+    },
+    {
+     "text": "nets",
+     "start": 10.198,
+     "end": 10.448
+    },
+    {
+     "text": "the",
+     "start": 10.448,
+     "end": 10.535
+    },
+    {
+     "text": "attacker",
+     "start": 10.535,
+     "end": 11.323
+    },
+    {
+     "text": "0.00809",
+     "start": 11.323,
+     "end": 11.41
+    },
+    {
+     "text": "ETH;",
+     "start": 11.41,
+     "end": 12.16
+    },
+    {
+     "text": "the",
+     "start": 12.655,
+     "end": 12.78
+    },
+    {
+     "text": "exact",
+     "start": 12.78,
+     "end": 13.205
+    },
+    {
+     "text": "figure",
+     "start": 13.205,
+     "end": 13.555
+    },
+    {
+     "text": "is",
+     "start": 13.555,
+     "end": 13.667
+    },
+    {
+     "text": "on",
+     "start": 13.667,
+     "end": 13.855
+    },
+    {
+     "text": "screen.",
+     "start": 13.855,
+     "end": 14.705
+    },
+    {
+     "text": "The",
+     "start": 15.175,
+     "end": 15.288
+    },
+    {
+     "text": "same",
+     "start": 15.288,
+     "end": 15.575
+    },
+    {
+     "text": "orders",
+     "start": 15.575,
+     "end": 16
+    },
+    {
+     "text": "in",
+     "start": 16,
+     "end": 16.15
+    },
+    {
+     "text": "one",
+     "start": 16.15,
+     "end": 16.35
+    },
+    {
+     "text": "batch",
+     "start": 16.35,
+     "end": 16.65
+    },
+    {
+     "text": "clear",
+     "start": 16.65,
+     "end": 16.912
+    },
+    {
+     "text": "at",
+     "start": 16.912,
+     "end": 17
+    },
+    {
+     "text": "0.011",
+     "start": 17,
+     "end": 18.725
+    },
+    {
+     "text": "either",
+     "start": 18.725,
+     "end": 19
+    },
+    {
+     "text": "way.",
+     "start": 19,
+     "end": 19.725
+    },
+    {
+     "text": "The",
+     "start": 20.195,
+     "end": 20.27
+    },
+    {
+     "text": "victim's",
+     "start": 20.27,
+     "end": 20.745
+    },
+    {
+     "text": "fifteen",
+     "start": 20.745,
+     "end": 21.17
+    },
+    {
+     "text": "tokens",
+     "start": 21.17,
+     "end": 21.758
+    },
+    {
+     "text": "cost",
+     "start": 21.758,
+     "end": 22.12
+    },
+    {
+     "text": "exactly",
+     "start": 22.12,
+     "end": 22.708
+    },
+    {
+     "text": "0.165",
+     "start": 22.708,
+     "end": 24.52
+    },
+    {
+     "text": "ETH",
+     "start": 24.52,
+     "end": 24.745
+    },
+    {
+     "text": "either",
+     "start": 24.745,
+     "end": 25.045
+    },
+    {
+     "text": "way,",
+     "start": 25.045,
+     "end": 25.87
+    },
+    {
+     "text": "and",
+     "start": 25.87,
+     "end": 25.982
+    },
+    {
+     "text": "the",
+     "start": 25.982,
+     "end": 26.07
+    },
+    {
+     "text": "attacker",
+     "start": 26.07,
+     "end": 26.583
+    },
+    {
+     "text": "ends",
+     "start": 26.583,
+     "end": 26.945
+    },
+    {
+     "text": "at",
+     "start": 26.945,
+     "end": 27.045
+    },
+    {
+     "text": "minus",
+     "start": 27.045,
+     "end": 27.408
+    },
+    {
+     "text": "one",
+     "start": 27.408,
+     "end": 27.645
+    },
+    {
+     "text": "wei",
+     "start": 27.645,
+     "end": 28.058
+    },
+    {
+     "text": "and",
+     "start": 28.058,
+     "end": 28.232
+    },
+    {
+     "text": "zero",
+     "start": 28.232,
+     "end": 28.57
+    },
+    {
+     "text": "tokens.",
+     "start": 28.57,
+     "end": 29.545
+    },
+    {
+     "text": "Then",
+     "start": 30.065,
+     "end": 30.278
+    },
+    {
+     "text": "the",
+     "start": 30.278,
+     "end": 30.365
+    },
+    {
+     "text": "permutation",
+     "start": 30.365,
+     "end": 31.115
+    },
+    {
+     "text": "filter:",
+     "start": 31.115,
+     "end": 31.99
+    },
+    {
+     "text": "256",
+     "start": 32.485,
+     "end": 33.66
+    },
+    {
+     "text": "shuffles",
+     "start": 33.66,
+     "end": 34.16
+    },
+    {
+     "text": "of",
+     "start": 34.16,
+     "end": 34.247
+    },
+    {
+     "text": "the",
+     "start": 34.247,
+     "end": 34.348
+    },
+    {
+     "text": "pure",
+     "start": 34.348,
+     "end": 34.635
+    },
+    {
+     "text": "rule",
+     "start": 34.635,
+     "end": 35.335
+    },
+    {
+     "text": "and",
+     "start": 35.335,
+     "end": 35.497
+    },
+    {
+     "text": "256",
+     "start": 35.497,
+     "end": 36.922
+    },
+    {
+     "text": "shuffled",
+     "start": 36.922,
+     "end": 37.322
+    },
+    {
+     "text": "interleavings",
+     "start": 37.322,
+     "end": 38.098
+    },
+    {
+     "text": "at",
+     "start": 38.098,
+     "end": 38.21
+    },
+    {
+     "text": "contract",
+     "start": 38.21,
+     "end": 38.697
+    },
+    {
+     "text": "level.",
+     "start": 38.697,
+     "end": 39.46
+    },
+    {
+     "text": "Same",
+     "start": 39.98,
+     "end": 40.23
+    },
+    {
+     "text": "price,",
+     "start": 40.23,
+     "end": 40.805
+    },
+    {
+     "text": "same",
+     "start": 40.805,
+     "end": 41.055
+    },
+    {
+     "text": "fills,",
+     "start": 41.055,
+     "end": 41.48
+    },
+    {
+     "text": "every",
+     "start": 41.48,
+     "end": 41.78
+    },
+    {
+     "text": "time.",
+     "start": 41.78,
+     "end": 42.555
+    }
+   ]
+  },
+  {
+   "id": "S4",
+   "start": 65.5,
+   "dur": 25.033,
+   "lead": 0.2,
+   "narr": 24.45,
+   "width": 1920,
+   "height": 1080,
+   "pills": [],
+   "words": [
+    {
+     "text": "Now",
+     "start": 0.5,
+     "end": 0.687
+    },
+    {
+     "text": "the",
+     "start": 0.687,
+     "end": 0.813
+    },
+    {
+     "text": "same",
+     "start": 0.813,
+     "end": 1.1
+    },
+    {
+     "text": "contrast",
+     "start": 1.1,
+     "end": 1.662
+    },
+    {
+     "text": "in",
+     "start": 1.662,
+     "end": 1.738
+    },
+    {
+     "text": "the",
+     "start": 1.738,
+     "end": 1.85
+    },
+    {
+     "text": "app,",
+     "start": 1.85,
+     "end": 2.45
+    },
+    {
+     "text": "against",
+     "start": 2.45,
+     "end": 2.787
+    },
+    {
+     "text": "the",
+     "start": 2.787,
+     "end": 2.875
+    },
+    {
+     "text": "real",
+     "start": 2.875,
+     "end": 3.15
+    },
+    {
+     "text": "contracts",
+     "start": 3.15,
+     "end": 3.8
+    },
+    {
+     "text": "on",
+     "start": 3.8,
+     "end": 3.912
+    },
+    {
+     "text": "a",
+     "start": 3.912,
+     "end": 4
+    },
+    {
+     "text": "local",
+     "start": 4,
+     "end": 4.362
+    },
+    {
+     "text": "Anvil",
+     "start": 4.362,
+     "end": 4.812
+    },
+    {
+     "text": "chain.",
+     "start": 4.812,
+     "end": 5.6
+    },
+    {
+     "text": "The",
+     "start": 6.07,
+     "end": 6.182
+    },
+    {
+     "text": "side-by-side",
+     "start": 6.182,
+     "end": 6.945
+    },
+    {
+     "text": "is",
+     "start": 6.945,
+     "end": 7.057
+    },
+    {
+     "text": "from",
+     "start": 7.057,
+     "end": 7.182
+    },
+    {
+     "text": "a",
+     "start": 7.182,
+     "end": 7.245
+    },
+    {
+     "text": "recorded",
+     "start": 7.245,
+     "end": 7.77
+    },
+    {
+     "text": "run,",
+     "start": 7.77,
+     "end": 8.358
+    },
+    {
+     "text": "labelled",
+     "start": 8.358,
+     "end": 8.795
+    },
+    {
+     "text": "as",
+     "start": 8.795,
+     "end": 8.92
+    },
+    {
+     "text": "such.",
+     "start": 8.92,
+     "end": 9.62
+    },
+    {
+     "text": "This",
+     "start": 10.09,
+     "end": 10.315
+    },
+    {
+     "text": "button",
+     "start": 10.315,
+     "end": 10.615
+    },
+    {
+     "text": "repeats",
+     "start": 10.615,
+     "end": 11.027
+    },
+    {
+     "text": "the",
+     "start": 11.027,
+     "end": 11.115
+    },
+    {
+     "text": "scenario",
+     "start": 11.115,
+     "end": 11.615
+    },
+    {
+     "text": "live,",
+     "start": 11.615,
+     "end": 12.29
+    },
+    {
+     "text": "inside",
+     "start": 12.29,
+     "end": 12.702
+    },
+    {
+     "text": "a",
+     "start": 12.702,
+     "end": 12.765
+    },
+    {
+     "text": "snapshot",
+     "start": 12.765,
+     "end": 13.34
+    },
+    {
+     "text": "that",
+     "start": 13.34,
+     "end": 13.477
+    },
+    {
+     "text": "is",
+     "start": 13.477,
+     "end": 13.615
+    },
+    {
+     "text": "rolled",
+     "start": 13.615,
+     "end": 13.915
+    },
+    {
+     "text": "back.",
+     "start": 13.915,
+     "end": 14.615
+    },
+    {
+     "text": "The",
+     "start": 15.085,
+     "end": 15.16
+    },
+    {
+     "text": "pool",
+     "start": 15.16,
+     "end": 15.435
+    },
+    {
+     "text": "victim",
+     "start": 15.435,
+     "end": 15.835
+    },
+    {
+     "text": "gets",
+     "start": 15.835,
+     "end": 16.085
+    },
+    {
+     "text": "fewer",
+     "start": 16.085,
+     "end": 16.31
+    },
+    {
+     "text": "tokens.",
+     "start": 16.31,
+     "end": 17.235
+    },
+    {
+     "text": "In",
+     "start": 17.73,
+     "end": 17.817
+    },
+    {
+     "text": "the",
+     "start": 17.817,
+     "end": 17.905
+    },
+    {
+     "text": "batch,",
+     "start": 17.905,
+     "end": 18.355
+    },
+    {
+     "text": "the",
+     "start": 18.355,
+     "end": 18.455
+    },
+    {
+     "text": "victim's",
+     "start": 18.455,
+     "end": 18.942
+    },
+    {
+     "text": "fill",
+     "start": 18.942,
+     "end": 19.417
+    },
+    {
+     "text": "and",
+     "start": 19.417,
+     "end": 19.542
+    },
+    {
+     "text": "the",
+     "start": 19.542,
+     "end": 19.63
+    },
+    {
+     "text": "price",
+     "start": 19.63,
+     "end": 19.955
+    },
+    {
+     "text": "do",
+     "start": 19.955,
+     "end": 20.067
+    },
+    {
+     "text": "not",
+     "start": 20.067,
+     "end": 20.255
+    },
+    {
+     "text": "move,",
+     "start": 20.255,
+     "end": 21.03
+    },
+    {
+     "text": "and",
+     "start": 21.03,
+     "end": 21.142
+    },
+    {
+     "text": "the",
+     "start": 21.142,
+     "end": 21.23
+    },
+    {
+     "text": "attacker",
+     "start": 21.23,
+     "end": 21.705
+    },
+    {
+     "text": "nets",
+     "start": 21.705,
+     "end": 21.967
+    },
+    {
+     "text": "zero",
+     "start": 21.967,
+     "end": 22.33
+    },
+    {
+     "text": "tokens",
+     "start": 22.33,
+     "end": 22.942
+    },
+    {
+     "text": "and",
+     "start": 22.942,
+     "end": 23.105
+    },
+    {
+     "text": "loses",
+     "start": 23.105,
+     "end": 23.505
+    },
+    {
+     "text": "one",
+     "start": 23.505,
+     "end": 23.73
+    },
+    {
+     "text": "wei.",
+     "start": 23.73,
+     "end": 24.43
+    }
+   ]
+  },
+  {
+   "id": "S5",
+   "start": 90.533,
+   "dur": 18.3,
+   "lead": 0.2,
+   "narr": 17.75,
+   "width": 1920,
+   "height": 1080,
+   "pills": [],
+   "words": [
+    {
+     "text": "This",
+     "start": 0.45,
+     "end": 0.65
+    },
+    {
+     "text": "panel",
+     "start": 0.65,
+     "end": 1.075
+    },
+    {
+     "text": "is",
+     "start": 1.075,
+     "end": 1.188
+    },
+    {
+     "text": "where",
+     "start": 1.188,
+     "end": 1.313
+    },
+    {
+     "text": "the",
+     "start": 1.313,
+     "end": 1.4
+    },
+    {
+     "text": "guarantee",
+     "start": 1.4,
+     "end": 1.85
+    },
+    {
+     "text": "stops.",
+     "start": 1.85,
+     "end": 2.675
+    },
+    {
+     "text": "It",
+     "start": 3.145,
+     "end": 3.27
+    },
+    {
+     "text": "holds",
+     "start": 3.27,
+     "end": 3.583
+    },
+    {
+     "text": "under",
+     "start": 3.583,
+     "end": 3.77
+    },
+    {
+     "text": "condition",
+     "start": 3.77,
+     "end": 4.283
+    },
+    {
+     "text": "C:",
+     "start": 4.283,
+     "end": 4.945
+    },
+    {
+     "text": "equal",
+     "start": 5.415,
+     "end": 5.69
+    },
+    {
+     "text": "legs,",
+     "start": 5.69,
+     "end": 6.24
+    },
+    {
+     "text": "priced",
+     "start": 6.24,
+     "end": 6.528
+    },
+    {
+     "text": "outside",
+     "start": 6.528,
+     "end": 7.028
+    },
+    {
+     "text": "every",
+     "start": 7.028,
+     "end": 7.328
+    },
+    {
+     "text": "other",
+     "start": 7.328,
+     "end": 7.54
+    },
+    {
+     "text": "order.",
+     "start": 7.54,
+     "end": 8.265
+    },
+    {
+     "text": "A",
+     "start": 8.735,
+     "end": 8.81
+    },
+    {
+     "text": "one-sided",
+     "start": 8.81,
+     "end": 9.385
+    },
+    {
+     "text": "buy",
+     "start": 9.385,
+     "end": 9.723
+    },
+    {
+     "text": "still",
+     "start": 9.723,
+     "end": 10.01
+    },
+    {
+     "text": "moves",
+     "start": 10.01,
+     "end": 10.272
+    },
+    {
+     "text": "the",
+     "start": 10.272,
+     "end": 10.36
+    },
+    {
+     "text": "price,",
+     "start": 10.36,
+     "end": 11.135
+    },
+    {
+     "text": "from",
+     "start": 11.135,
+     "end": 11.335
+    },
+    {
+     "text": "0.011",
+     "start": 11.335,
+     "end": 12.76
+    },
+    {
+     "text": "to",
+     "start": 12.76,
+     "end": 12.885
+    },
+    {
+     "text": "0.012",
+     "start": 12.885,
+     "end": 14.298
+    },
+    {
+     "text": "ETH.",
+     "start": 14.298,
+     "end": 15.01
+    },
+    {
+     "text": "That",
+     "start": 15.505,
+     "end": 15.667
+    },
+    {
+     "text": "is",
+     "start": 15.667,
+     "end": 15.805
+    },
+    {
+     "text": "market",
+     "start": 15.805,
+     "end": 16.105
+    },
+    {
+     "text": "power,",
+     "start": 16.105,
+     "end": 16.605
+    },
+    {
+     "text": "not",
+     "start": 16.605,
+     "end": 16.83
+    },
+    {
+     "text": "ordering.",
+     "start": 16.83,
+     "end": 17.73
+    }
+   ]
+  },
+  {
+   "id": "S6",
+   "start": 108.833,
+   "dur": 21.733,
+   "lead": 0.2,
+   "narr": 21.245,
+   "width": 1920,
+   "height": 1080,
+   "pills": [
+    {
+     "from": 0,
+     "to": 5,
+     "text": "Sped up 2.2x"
+    },
+    {
+     "from": 5,
+     "to": 7.92,
+     "text": "Sped up 2.4x"
+    },
+    {
+     "from": 7.92,
+     "to": 9.92,
+     "text": "Sped up 3x"
+    },
+    {
+     "from": 9.92,
+     "to": 12.83,
+     "text": "Sped up 1.2x"
+    },
+    {
+     "from": 12.83,
+     "to": 14.67,
+     "text": "Sped up 3x"
+    }
+   ],
+   "words": [
+    {
+     "text": "Now",
+     "start": 0.55,
+     "end": 0.737
+    },
+    {
+     "text": "the",
+     "start": 0.737,
+     "end": 0.825
+    },
+    {
+     "text": "lifecycle.",
+     "start": 0.825,
+     "end": 1.875
+    },
+    {
+     "text": "A",
+     "start": 2.345,
+     "end": 2.432
+    },
+    {
+     "text": "built-in",
+     "start": 2.432,
+     "end": 2.87
+    },
+    {
+     "text": "trader,",
+     "start": 2.87,
+     "end": 3.545
+    },
+    {
+     "text": "an",
+     "start": 3.545,
+     "end": 3.695
+    },
+    {
+     "text": "Anvil",
+     "start": 3.695,
+     "end": 4.145
+    },
+    {
+     "text": "dev",
+     "start": 4.145,
+     "end": 4.333
+    },
+    {
+     "text": "account,",
+     "start": 4.333,
+     "end": 4.97
+    },
+    {
+     "text": "places",
+     "start": 4.97,
+     "end": 5.333
+    },
+    {
+     "text": "an",
+     "start": 5.333,
+     "end": 5.445
+    },
+    {
+     "text": "order",
+     "start": 5.445,
+     "end": 5.782
+    },
+    {
+     "text": "into",
+     "start": 5.782,
+     "end": 5.958
+    },
+    {
+     "text": "the",
+     "start": 5.958,
+     "end": 6.07
+    },
+    {
+     "text": "open",
+     "start": 6.07,
+     "end": 6.395
+    },
+    {
+     "text": "batch.",
+     "start": 6.395,
+     "end": 7.145
+    },
+    {
+     "text": "The",
+     "start": 7.615,
+     "end": 7.715
+    },
+    {
+     "text": "dev-chain",
+     "start": 7.715,
+     "end": 8.24
+    },
+    {
+     "text": "control",
+     "start": 8.24,
+     "end": 8.927
+    },
+    {
+     "text": "advances",
+     "start": 8.927,
+     "end": 9.44
+    },
+    {
+     "text": "time",
+     "start": 9.44,
+     "end": 9.79
+    },
+    {
+     "text": "to",
+     "start": 9.79,
+     "end": 9.915
+    },
+    {
+     "text": "close",
+     "start": 9.915,
+     "end": 10.227
+    },
+    {
+     "text": "the",
+     "start": 10.227,
+     "end": 10.315
+    },
+    {
+     "text": "batch.",
+     "start": 10.315,
+     "end": 11.065
+    },
+    {
+     "text": "Anyone",
+     "start": 11.56,
+     "end": 11.935
+    },
+    {
+     "text": "can",
+     "start": 11.935,
+     "end": 12.11
+    },
+    {
+     "text": "clear",
+     "start": 12.11,
+     "end": 12.385
+    },
+    {
+     "text": "it,",
+     "start": 12.385,
+     "end": 12.785
+    },
+    {
+     "text": "and",
+     "start": 12.785,
+     "end": 12.897
+    },
+    {
+     "text": "the",
+     "start": 12.897,
+     "end": 12.985
+    },
+    {
+     "text": "contract",
+     "start": 12.985,
+     "end": 13.56
+    },
+    {
+     "text": "picks",
+     "start": 13.56,
+     "end": 13.81
+    },
+    {
+     "text": "one",
+     "start": 13.81,
+     "end": 14.035
+    },
+    {
+     "text": "price.",
+     "start": 14.035,
+     "end": 14.785
+    },
+    {
+     "text": "Then",
+     "start": 15.255,
+     "end": 15.417
+    },
+    {
+     "text": "the",
+     "start": 15.417,
+     "end": 15.505
+    },
+    {
+     "text": "trader",
+     "start": 15.505,
+     "end": 15.88
+    },
+    {
+     "text": "claims",
+     "start": 15.88,
+     "end": 16.217
+    },
+    {
+     "text": "the",
+     "start": 16.217,
+     "end": 16.342
+    },
+    {
+     "text": "fill.",
+     "start": 16.342,
+     "end": 17.055
+    },
+    {
+     "text": "Placing",
+     "start": 17.525,
+     "end": 17.975
+    },
+    {
+     "text": "and",
+     "start": 17.975,
+     "end": 18.1
+    },
+    {
+     "text": "clearing",
+     "start": 18.1,
+     "end": 18.5
+    },
+    {
+     "text": "declare",
+     "start": 18.5,
+     "end": 18.813
+    },
+    {
+     "text": "no",
+     "start": 18.813,
+     "end": 18.975
+    },
+    {
+     "text": "Call,",
+     "start": 18.975,
+     "end": 19.55
+    },
+    {
+     "text": "so",
+     "start": 19.55,
+     "end": 19.688
+    },
+    {
+     "text": "they",
+     "start": 19.688,
+     "end": 19.825
+    },
+    {
+     "text": "cannot",
+     "start": 19.825,
+     "end": 20.175
+    },
+    {
+     "text": "move",
+     "start": 20.175,
+     "end": 20.4
+    },
+    {
+     "text": "funds.",
+     "start": 20.4,
+     "end": 21.225
+    }
+   ]
+  },
+  {
+   "id": "S7",
+   "start": 130.567,
+   "dur": 21.367,
+   "lead": 0.2,
+   "narr": 20.85,
+   "width": 1920,
+   "height": 1080,
+   "pills": [],
+   "words": [
+    {
+     "text": "Fe",
+     "start": 0.475,
+     "end": 0.7
+    },
+    {
+     "text": "makes",
+     "start": 0.7,
+     "end": 0.975
+    },
+    {
+     "text": "that",
+     "start": 0.975,
+     "end": 1.2
+    },
+    {
+     "text": "claim",
+     "start": 1.2,
+     "end": 1.537
+    },
+    {
+     "text": "checkable",
+     "start": 1.537,
+     "end": 2
+    },
+    {
+     "text": "from",
+     "start": 2,
+     "end": 2.138
+    },
+    {
+     "text": "the",
+     "start": 2.138,
+     "end": 2.225
+    },
+    {
+     "text": "signature.",
+     "start": 2.225,
+     "end": 3.15
+    },
+    {
+     "text": "select_price,",
+     "start": 3.645,
+     "end": 4.47
+    },
+    {
+     "text": "the",
+     "start": 4.47,
+     "end": 4.57
+    },
+    {
+     "text": "clearing",
+     "start": 4.57,
+     "end": 4.945
+    },
+    {
+     "text": "function,",
+     "start": 4.945,
+     "end": 5.595
+    },
+    {
+     "text": "declares",
+     "start": 5.595,
+     "end": 6.045
+    },
+    {
+     "text": "no",
+     "start": 6.045,
+     "end": 6.22
+    },
+    {
+     "text": "effects",
+     "start": 6.22,
+     "end": 6.557
+    },
+    {
+     "text": "at",
+     "start": 6.557,
+     "end": 6.645
+    },
+    {
+     "text": "all:",
+     "start": 6.645,
+     "end": 7.32
+    },
+    {
+     "text": "it",
+     "start": 7.79,
+     "end": 7.89
+    },
+    {
+     "text": "cannot",
+     "start": 7.89,
+     "end": 8.24
+    },
+    {
+     "text": "read",
+     "start": 8.24,
+     "end": 8.427
+    },
+    {
+     "text": "the",
+     "start": 8.427,
+     "end": 8.515
+    },
+    {
+     "text": "clock,",
+     "start": 8.515,
+     "end": 9.14
+    },
+    {
+     "text": "a",
+     "start": 9.14,
+     "end": 9.253
+    },
+    {
+     "text": "caller",
+     "start": 9.253,
+     "end": 9.64
+    },
+    {
+     "text": "or",
+     "start": 9.64,
+     "end": 9.765
+    },
+    {
+     "text": "storage,",
+     "start": 9.765,
+     "end": 10.265
+    },
+    {
+     "text": "or",
+     "start": 10.265,
+     "end": 10.39
+    },
+    {
+     "text": "move",
+     "start": 10.39,
+     "end": 10.615
+    },
+    {
+     "text": "funds.",
+     "start": 10.615,
+     "end": 11.44
+    },
+    {
+     "text": "The",
+     "start": 11.91,
+     "end": 11.985
+    },
+    {
+     "text": "handlers",
+     "start": 11.985,
+     "end": 12.535
+    },
+    {
+     "text": "that",
+     "start": 12.535,
+     "end": 12.685
+    },
+    {
+     "text": "place",
+     "start": 12.685,
+     "end": 13.022
+    },
+    {
+     "text": "orders",
+     "start": 13.022,
+     "end": 13.485
+    },
+    {
+     "text": "and",
+     "start": 13.485,
+     "end": 13.61
+    },
+    {
+     "text": "clear",
+     "start": 13.61,
+     "end": 13.885
+    },
+    {
+     "text": "batches",
+     "start": 13.885,
+     "end": 14.46
+    },
+    {
+     "text": "declare",
+     "start": 14.46,
+     "end": 14.835
+    },
+    {
+     "text": "no",
+     "start": 14.835,
+     "end": 15.022
+    },
+    {
+     "text": "Call,",
+     "start": 15.022,
+     "end": 15.735
+    },
+    {
+     "text": "and",
+     "start": 15.735,
+     "end": 15.847
+    },
+    {
+     "text": "the",
+     "start": 15.847,
+     "end": 15.935
+    },
+    {
+     "text": "compiler",
+     "start": 15.935,
+     "end": 16.46
+    },
+    {
+     "text": "enforces",
+     "start": 16.46,
+     "end": 17.072
+    },
+    {
+     "text": "it.",
+     "start": 17.072,
+     "end": 17.635
+    },
+    {
+     "text": "Only",
+     "start": 18.13,
+     "end": 18.405
+    },
+    {
+     "text": "deposit",
+     "start": 18.405,
+     "end": 18.905
+    },
+    {
+     "text": "token",
+     "start": 18.905,
+     "end": 19.33
+    },
+    {
+     "text": "and",
+     "start": 19.33,
+     "end": 19.442
+    },
+    {
+     "text": "withdraw",
+     "start": 19.442,
+     "end": 19.83
+    },
+    {
+     "text": "hold",
+     "start": 19.83,
+     "end": 20.105
+    },
+    {
+     "text": "Call.",
+     "start": 20.105,
+     "end": 20.83
+    }
+   ]
+  },
+  {
+   "id": "S8",
+   "start": 151.933,
+   "dur": 12.167,
+   "lead": 0.2,
+   "narr": 11.63,
+   "width": 1920,
+   "height": 1080,
+   "pills": [],
+   "words": [
+    {
+     "text": "Everything",
+     "start": 0.475,
+     "end": 0.9
+    },
+    {
+     "text": "ran",
+     "start": 0.9,
+     "end": 1.275
+    },
+    {
+     "text": "on",
+     "start": 1.275,
+     "end": 1.388
+    },
+    {
+     "text": "a",
+     "start": 1.388,
+     "end": 1.45
+    },
+    {
+     "text": "local",
+     "start": 1.45,
+     "end": 1.787
+    },
+    {
+     "text": "Anvil",
+     "start": 1.787,
+     "end": 2.188
+    },
+    {
+     "text": "chain:",
+     "start": 2.188,
+     "end": 2.925
+    },
+    {
+     "text": "dev",
+     "start": 3.42,
+     "end": 3.608
+    },
+    {
+     "text": "accounts,",
+     "start": 3.608,
+     "end": 4.245
+    },
+    {
+     "text": "test",
+     "start": 4.245,
+     "end": 4.545
+    },
+    {
+     "text": "funds,",
+     "start": 4.545,
+     "end": 5.12
+    },
+    {
+     "text": "and",
+     "start": 5.12,
+     "end": 5.233
+    },
+    {
+     "text": "a",
+     "start": 5.233,
+     "end": 5.295
+    },
+    {
+     "text": "book",
+     "start": 5.295,
+     "end": 5.608
+    },
+    {
+     "text": "seeded",
+     "start": 5.608,
+     "end": 5.945
+    },
+    {
+     "text": "by",
+     "start": 5.945,
+     "end": 6.083
+    },
+    {
+     "text": "the",
+     "start": 6.083,
+     "end": 6.182
+    },
+    {
+     "text": "setup",
+     "start": 6.182,
+     "end": 6.545
+    },
+    {
+     "text": "script.",
+     "start": 6.545,
+     "end": 7.32
+    },
+    {
+     "text": "Not",
+     "start": 7.84,
+     "end": 8.003
+    },
+    {
+     "text": "a",
+     "start": 8.003,
+     "end": 8.065
+    },
+    {
+     "text": "live",
+     "start": 8.065,
+     "end": 8.34
+    },
+    {
+     "text": "market.",
+     "start": 8.34,
+     "end": 9.215
+    },
+    {
+     "text": "Code",
+     "start": 9.71,
+     "end": 9.972
+    },
+    {
+     "text": "and",
+     "start": 9.972,
+     "end": 10.085
+    },
+    {
+     "text": "tests",
+     "start": 10.085,
+     "end": 10.51
+    },
+    {
+     "text": "are",
+     "start": 10.51,
+     "end": 10.597
+    },
+    {
+     "text": "in",
+     "start": 10.597,
+     "end": 10.673
+    },
+    {
+     "text": "the",
+     "start": 10.673,
+     "end": 10.76
+    },
+    {
+     "text": "repo.",
+     "start": 10.76,
+     "end": 11.61
+    }
+   ]
+  }
+ ]
+}

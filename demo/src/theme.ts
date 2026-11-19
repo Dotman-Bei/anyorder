@@ -8,7 +8,7 @@ export const c = {
   text: '#ece9e2',
   muted: '#9aa093',
   bronze: '#b8935a',
-  bar: 'rgba(8,9,8,0.86)',
+  bar: 'rgba(8,9,8,0.96)',
 }
 export const sans = '"Segoe UI", "Helvetica Neue", Arial, sans-serif'
 export const mono = 'Consolas, "Cascadia Mono", "Courier New", monospace'
