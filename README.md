@@ -150,6 +150,16 @@ Measured on `anvil --hardfork osaka --enable-tx-gas-limit` (per-transaction cap 
 
 The rule: `maxOrders` is the largest measured N whose clearing used at most 8,388,608 gas (half the cap); that gives `maxOrders = 100`, and `demoBatchSize = 20` (the smaller of that and 20). The architect's measurement of the real contract (recorded in the core design spec, section 9) is `clear()` of 10 / 50 / 100 orders at 333,508 / 1,446,094 / 2,809,751 gas. The end-to-end test `pnpm -C web test:e2e` clears a full batch of `maxOrders` under the cap and prints the gas it used. No gas-efficiency claim is made beyond measured numbers.
 
+The real contract, measured by `pnpm -C web exec tsx scripts/gas-table.ts` on the same Anvil settings with the demo order mix (full table and method in [`docs/gas.md`](docs/gas.md)):
+
+| Orders in the batch | `clear()` gas, real contract | Share of the cap |
+|---:|---:|---:|
+| 10 | 358462 | 2.1% |
+| 25 | 807348 | 4.8% |
+| 50 | 1567284 | 9.3% |
+| 75 | 2380590 | 14.2% |
+| 100 | 3156298 | 18.8% |
+
 ## Build & test
 
 Tools to install: fe 26.6.0 (on Windows, the release asset; elsewhere `feup`), Foundry (for `anvil` and `cast`), Node 22 with pnpm 10, and Python 3.12.
