@@ -243,16 +243,23 @@ The ABI JSON of all three is frozen in `abi/` by A task 10.
 
 ## 9. Gas
 
-- **Spike (A task 2, right after the skeleton):** `spikes/gas` stores orders in this storage shape,
-  clears like AnyOrder and writes every fill (worst case), on `anvil --hardfork osaka
-  --enable-tx-gas-limit`, for N = 10, 50, 100. Rule: `maxOrders` = largest N with `clear()` ≤
-  8,388,608 gas (half of 16,777,216); `demoBatchSize` = min(maxOrders, 20); written to
-  `deploy/params.json`. Measured by the architect: 409,402 / 2,161,907 / 4,426,468 → maxOrders 100,
-  demoBatchSize 20.
-- **Real contract** (measured by the architect on the verified code): `clear()` of 10 / 50 / 100
-  orders used 333,508 / 1,446,094 / 2,809,751 gas; B's end-to-end test clears a full batch of
-  `maxOrders` under the cap (3,156,298 gas for 100 with the demo order mix).
-- **Stretch S1** publishes the gas table. No gas-efficiency claim is made beyond measured numbers.
+All three sets of `clear()` measurements ran on `anvil --hardfork osaka --enable-tx-gas-limit`
+(per-transaction cap 16,777,216). `clear()` gas grows with the order count and with the number of
+non-zero fills (one storage write each), so the sets differ by what they measured.
+
+| Set | What it measured | Who measured, how | `clear()` gas at 10 / 50 / 100 orders |
+|---|---|---|---|
+| gas spike (prototype, every order filled) | `spikes/gas`: this storage shape, clears like AnyOrder, writes every fill (worst case) | the architect, then A task 2 with `bash scripts/gas-spike.sh` (`docs/gas/spike.md`) | 409,402 / 2,161,907 / 4,426,468 |
+| architect's planning measurement (real contract, order mix not recorded) | the verified contract code before the build; which orders were placed was not recorded | the architect, 2026-11-18 | 333,508 / 1,446,094 / 2,809,751 |
+| gas table (real contract, demo order mix) | the deployed contract with the demo order mix (limits 0.009-0.014 ETH per token, 1-4 tokens per order, three makers); also N = 25 and 75 in `docs/gas.md` | Stretch S1 with `pnpm -C web exec tsx scripts/gas-table.ts` | 358,462 / 1,567,284 / 3,156,298 |
+
+- **Rule (from the gas spike):** `maxOrders` = largest N with `clear()` ≤ 8,388,608 gas (half of
+  16,777,216); `demoBatchSize` = min(maxOrders, 20); written to `deploy/params.json`. Result:
+  maxOrders 100, demoBatchSize 20.
+- **Numbers to quote:** the gas table. The planning measurement shows scale only and is not
+  comparable row by row with it. B's end-to-end test clears a full batch of `maxOrders` with the
+  demo order mix under the cap and prints its gas, which matches the gas table's 100-order row.
+- No gas-efficiency claim is made beyond measured numbers.
 
 ## 10. Evidence suite
 

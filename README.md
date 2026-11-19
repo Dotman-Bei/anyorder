@@ -140,25 +140,31 @@ Unaudited. This is a hackathon prototype for a local chain; do not deposit value
 
 ### Gas
 
-Measured on `anvil --hardfork osaka --enable-tx-gas-limit` (per-transaction cap 16,777,216 gas). The prototype in `spikes/gas` stores orders in AnyOrder's planned storage shape and writes every order's fill (the worst case); `bash scripts/gas-spike.sh` measures it, and the result is in `docs/gas/spike.md` and `deploy/params.json`:
+Three sets of `clear()` measurements exist. All ran on `anvil --hardfork osaka --enable-tx-gas-limit` (per-transaction cap 16,777,216 gas), and they differ because they measured different things: `clear()` gas grows with the number of orders and with how many of them fill, since every non-zero fill is a storage write.
 
-| Orders in the batch | `clear()` gas, spike | Share of the cap |
+**1. The gas spike (prototype, every order filled).** Measured before the contract existed, by the architect and again by core task 2 with `bash scripts/gas-spike.sh`. The prototype in `spikes/gas` stores orders in AnyOrder's planned storage shape and writes a fill for every order (the worst case). It sets the per-batch cap; the result is in `docs/gas/spike.md` and `deploy/params.json`.
+
+| Orders in the batch | `clear()` gas, gas spike (prototype, every order filled) | Share of the cap |
 |---:|---:|---:|
 | 10 | 409,402 | 2% |
 | 50 | 2,161,907 | 12% |
 | 100 | 4,426,468 | 26% |
 
-The rule: `maxOrders` is the largest measured N whose clearing used at most 8,388,608 gas (half the cap); that gives `maxOrders = 100`, and `demoBatchSize = 20` (the smaller of that and 20). The architect's measurement of the real contract (recorded in the core design spec, section 9) is `clear()` of 10 / 50 / 100 orders at 333,508 / 1,446,094 / 2,809,751 gas. The end-to-end test `pnpm -C web test:e2e` clears a full batch of `maxOrders` under the cap and prints the gas it used. No gas-efficiency claim is made beyond measured numbers.
+The rule: `maxOrders` is the largest measured N whose clearing used at most 8,388,608 gas (half the cap); that gives `maxOrders = 100`, and `demoBatchSize = 20` (the smaller of that and 20).
 
-The real contract, measured by `pnpm -C web exec tsx scripts/gas-table.ts` on the same Anvil settings with the demo order mix (full table and method in [`docs/gas.md`](docs/gas.md)):
+**2. The architect's planning measurement (real contract, order mix not recorded).** During planning (2026-11-18) the architect cleared batches of 10 / 50 / 100 orders on the verified contract code and recorded the gas in the core design spec, section 9, but not which orders were placed: 333,508 / 1,446,094 / 2,809,751 gas. It shows the scale only; it is not comparable row by row with the gas table below, which used a known order mix.
 
-| Orders in the batch | `clear()` gas, real contract | Share of the cap |
+**3. The gas table (real contract, demo order mix).** These are the numbers to quote. Stretch task S1 measured the deployed contract with `pnpm -C web exec tsx scripts/gas-table.ts` and the demo order mix (limits 0.009-0.014 ETH per token, 1-4 tokens per order, three makers); full table and method in [`docs/gas.md`](docs/gas.md). The end-to-end test `pnpm -C web test:e2e` clears a full batch of `maxOrders` with the same mix under the cap and prints the gas it used.
+
+| Orders in the batch | `clear()` gas, gas table (real contract, demo order mix) | Share of the cap |
 |---:|---:|---:|
 | 10 | 358462 | 2.1% |
 | 25 | 807348 | 4.8% |
 | 50 | 1567284 | 9.3% |
 | 75 | 2380590 | 14.2% |
 | 100 | 3156298 | 18.8% |
+
+No gas-efficiency claim is made beyond these measured numbers.
 
 ## Build & test
 
@@ -199,7 +205,7 @@ What each proves:
 | `token_*` | the ERC20 and the proxy-actor pattern |
 | `python ref/clearing_ref.py --check` / `--selftest` | the vectors are current / the rule matches the oracle on 20,000 random books and the lemmas and condition C hold |
 | `bash scripts/check-abi.sh` | the three deployed contracts' ABIs still match the frozen snapshots in `abi/` |
-| `bash scripts/gas-spike.sh` | the clearing gas at N = 10, 50, 100 (table above) |
+| `bash scripts/gas-spike.sh` | the gas spike (prototype, every order filled) at N = 10, 50, 100 (under Security notes, Gas) |
 | `pnpm -C web test`, `pnpm -C web test:e2e` | the frontend's unit tests; the end-to-end suite against a real Anvil: ABI module matches `abi/`, ABI check from a path with spaces, the production lifecycle with real block time, a full batch of `maxOrders` under the cap, and the scenario reproducing the `fe test` constants |
 
 Property tests are seeded (`KeccakRng::seeded(n)`) and hand-rolled, so a failure replays exactly. At the time of writing, `fe test` reports `test result: ok. 57 passed; 0 failed`.
