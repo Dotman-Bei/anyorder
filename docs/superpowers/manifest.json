@@ -1073,6 +1073,153 @@
       "human_gate": false,
       "allow_empty": false,
       "status": "pending"
+    },
+    {
+      "id": "dapp:11",
+      "subsystem": "dapp",
+      "title": "Staleness means the RPC stopped answering, not that no block arrived",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:10"
+      ],
+      "effort": "medium",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "web/scripts/lib/chrome.ts",
+          "web/scripts/idle-check.ts"
+        ],
+        "modify": [
+          "web/src/chain/state.ts",
+          "web/src/app/live.ts"
+        ],
+        "test": [
+          "web/src/chain/state.test.ts"
+        ]
+      },
+      "provides": [
+        "nextChainState(prev: ChainState, probe: Probe, now: number, pollMs?: number): ChainState (web/src/chain/state.ts)",
+        "findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)",
+        "pnpm -C web exec tsx scripts/idle-check.ts -> last line IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)"
+      ],
+      "requires": [
+        "classify, isStale, batchPhase, secondsLeft, RECOVERY, POLL_MS, type ChainState (web/src/chain/state.ts)",
+        "useDeployment, useClients, useChain, useBlockRead, readBatch, type OrderRow, type BatchSnapshot (web/src/app/live.ts)",
+        "useLive, ChainNotice, selectTrader, useSelectedTrader, errorName, TRADER_NOTE (web/src/app/shared.tsx); island registry islands (web/src/app/islands.tsx)",
+        "deployAll, fundTraders, seedDemo, demoOrder, advanceTo (web/scripts/lib/deploy.ts), startAnvil, rpcReady (web/scripts/lib/anvil.ts), deployLocal(rpcUrl?, outFile?, batchSeconds?) (web/scripts/deploy-local.ts)",
+        "clientsFor(rpcUrl), send(clients, request), CLEAR_GAS_LIMIT (web/src/chain/client.ts)",
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test && pnpm -C web exec tsx scripts/idle-check.ts && pnpm -C web ui-gate app",
+        "expect": "GATE: PASS"
+      },
+      "commit": "fix(dapp): staleness is measured from the last answered poll, not the last new block",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "docs:3",
+      "subsystem": "docs",
+      "title": "One gas story in the README and spec §9",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-docs.md",
+      "depends_on": [
+        "stretch:1"
+      ],
+      "effort": "low",
+      "files": {
+        "create": [
+          "scripts/check-gas-story.sh"
+        ],
+        "modify": [
+          "README.md",
+          "docs/superpowers/specs/2026-11-18-anyorder-core-design.md"
+        ],
+        "test": []
+      },
+      "provides": [
+        "bash scripts/check-gas-story.sh -> last line GAS-STORY: OK"
+      ],
+      "requires": [
+        "README.md (R2-contract-protocol v1 + event-overlay)"
+      ],
+      "gate": {
+        "run": "bash scripts/check-gas-story.sh",
+        "expect": "GAS-STORY: OK"
+      },
+      "commit": "docs: one gas story, every clear() figure labelled by what it measured",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "docs:4",
+      "subsystem": "docs",
+      "title": "Pitch wording that matches what the tests prove",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-docs.md",
+      "depends_on": [
+        "docs:3"
+      ],
+      "effort": "low",
+      "files": {
+        "create": [],
+        "modify": [
+          "README.md",
+          "SUBMISSION.md",
+          "docs/gates/submission-draft.md",
+          "docs/superpowers/specs/2026-11-18-anyorder-core-design.md",
+          "docs/superpowers/specs/2026-11-18-anyorder-docs-stretch-design.md"
+        ],
+        "test": []
+      },
+      "provides": [],
+      "requires": [],
+      "gate": {
+        "run": "p='A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit.'; ok=1; left=$(git grep -l -i -e 'nothing to explo[i]t' -- . ':!docs/idea-forge/' ':!docs/superpowers/plans/'); [ -z \"$left\" ] || { echo \"OLD PITCH IN: $left\"; ok=0; }; for f in README.md SUBMISSION.md docs/gates/submission-draft.md docs/superpowers/specs/2026-11-18-anyorder-core-design.md; do grep -qF \"$p\" \"$f\" || { echo \"NEW PITCH MISSING: $f\"; ok=0; }; done; [ \"$(sed -n 4p README.md)\" = \"$p\" ] || { echo 'README line 4 is not the pitch'; ok=0; }; grep -qxF \"**Pitch:** $p\" SUBMISSION.md || { echo 'SUBMISSION Pitch line differs'; ok=0; }; if [ \"$ok\" = 1 ]; then echo 'PITCH: OK'; else echo 'PITCH: FAIL'; false; fi",
+        "expect": "PITCH: OK"
+      },
+      "commit": "docs: pitch wording that matches what the tests prove",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:12",
+      "subsystem": "dapp",
+      "title": "UI polish (cut first): link-preview image from the real landing page",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:11",
+        "docs:4"
+      ],
+      "effort": "medium",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "web/scripts/share-image.ts",
+          "web/public/share.jpg"
+        ],
+        "modify": [
+          "web/index.html"
+        ],
+        "test": []
+      },
+      "provides": [
+        "web/public/share.jpg (1200x630 still of the built landing page) + pnpm -C web exec tsx scripts/share-image.ts [--check] -> last line SHARE: OK 1200x630 <bytes> bytes"
+      ],
+      "requires": [
+        "findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)",
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web exec tsx scripts/share-image.ts --check && pnpm -C web ui-gate landing",
+        "expect": "GATE: PASS"
+      },
+      "commit": "feat(dapp): link-preview image captured from the real landing page",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
     }
   ]
 }

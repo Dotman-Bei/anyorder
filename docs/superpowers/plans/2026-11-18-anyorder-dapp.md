@@ -22,7 +22,7 @@ Conventions for every task in this plan:
   unlocked dev accounts.
 - Paths contain spaces on this machine ("VIBE CODE"): child processes take argument arrays, never a
   shell string.
-- UI tasks (5-10): read `~/.claude/skills/design-taste-frontend/SKILL.md` in full first, then
+- UI tasks (5-12): read `~/.claude/skills/design-taste-frontend/SKILL.md` in full first, then
   `references/copy.md`, `copy-voice.md`, `system.md`, `layout-v4.md`, `sections.md`, `cards.md`,
   `motion.md`, `moments.md`, `effects-usage.md`, `gate.md`. Never invoke a Skill tool, never re-run a
   deal (the deal below is pinned), never edit a kit file, never add a waiver for `kit-edited`. You may
@@ -3244,3 +3244,722 @@ Expected: PASS — `GATE: PASS`
 The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
 those paths with this message. The executor never runs git.
 Message: `feat(dapp): optional injected-wallet mode on the local chain`
+
+---
+
+### Task 11: Staleness means the RPC stopped answering, not that no block arrived
+
+**Files:**
+- Modify: `web/src/chain/state.ts`
+- Modify: `web/src/app/live.ts`
+- Test: `web/src/chain/state.test.ts`
+- Create: `web/scripts/lib/chrome.ts`
+- Create: `web/scripts/idle-check.ts`
+
+**Depends on:** Task 10
+**Effort:** medium
+**Model tier:** top
+**Provides:** `nextChainState(prev: ChainState, probe: Probe, now: number, pollMs?: number): ChainState (web/src/chain/state.ts)`, `findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)`, `pnpm -C web exec tsx scripts/idle-check.ts -> last line IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)`
+**Requires:** `classify, isStale, batchPhase, secondsLeft, RECOVERY, POLL_MS, type ChainState (web/src/chain/state.ts)`, `useDeployment, useClients, useChain, useBlockRead, readBatch, type OrderRow, type BatchSnapshot (web/src/app/live.ts)`, `useLive, ChainNotice, selectTrader, useSelectedTrader, errorName, TRADER_NOTE (web/src/app/shared.tsx); island registry islands (web/src/app/islands.tsx)`, `deployAll, fundTraders, seedDemo, demoOrder, advanceTo (web/scripts/lib/deploy.ts), startAnvil, rpcReady (web/scripts/lib/anvil.ts), deployLocal(rpcUrl?, outFile?, batchSeconds?) (web/scripts/deploy-local.ts)`, `clientsFor(rpcUrl), send(clients, request), CLEAR_GAS_LIMIT (web/src/chain/client.ts)`, `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)`
+
+- [ ] **Step 1: Read the skill first**
+This is a UI task: its gate is the skill's finish gate on `/app`. Read `~/.claude/skills/design-taste-frontend/SKILL.md` in full, then the references named in this plan's conventions, before you change anything. This task changes **no markup, class name or copy**: only the data logic behind the chain notice, plus two Node scripts. If the gate reports a FAIL, fix it within these files, or return BLOCKED with the check id. Never edit a kit file, and never add a waiver for `kit-edited`.
+
+- [ ] **Step 2: Context: the defect and the upstream code you build on**
+The defect, found by the dapp:5 executor and confirmed by the orchestrator (tollgate Notes): `useChain` in `web/src/app/live.ts` kept the old `seenAt` while the block number did not change. Anvil mines only on transactions, so on an idle chain the live hero said "Data is N s ago: the chain stopped answering" after about 6 s, although the chain was answering. The dApp spec's state table had the same mistake ("stale: no new block for 3 polls"); the architect corrected it on 2026-11-19 to "no answered poll for 3 polls".
+
+The rule after this task: staleness is measured from the last poll the RPC **answered**. An idle chain stays live. A poll that fails while live data is on screen keeps that data until it would be stale, so one dropped poll does not flash "unavailable". After that, and whenever nothing live is on screen, the failure shows at once with its recovery action, as before. The hook's clock also ticks on every poll, so an RPC that hangs (no answer, no error yet) shows the stale notice before its request times out. `UNKNOWN` / "—" handling is untouched: islands still show nothing they have not read.
+
+Upstream code, exactly as it is in the repository (`classify, isStale, batchPhase, secondsLeft, RECOVERY, POLL_MS, type ChainState (web/src/chain/state.ts)`):
+```ts
+export const POLL_MS = 2000
+
+export type ChainState =
+  | { kind: 'loading' }
+  | { kind: 'unavailable'; reason: 'unreachable' | 'wrong-chain'; detail: string }
+  | { kind: 'not-deployed'; address: string }
+  | { kind: 'live'; block: bigint; blockTime: number; seenAt: number }
+
+export interface Probe {
+  chainId?: number
+  error?: string
+  hasCode?: boolean
+  address?: string
+  block?: bigint
+  blockTime?: number
+}
+
+/** Turns one probe of the RPC into the chain state. */
+export function classify(probe: Probe, now: number): ChainState
+
+/** Live data is stale after three missed polls. */
+export function isStale(state: ChainState, now: number, pollMs = POLL_MS): boolean {
+  return state.kind === 'live' && now - state.seenAt > 3 * pollMs
+}
+```
+`useDeployment, useClients, useChain, useBlockRead, readBatch, type OrderRow, type BatchSnapshot (web/src/app/live.ts)`: `useChain(deployment, clients): { state: ChainState; stale: boolean }` is the function this task replaces; the others stay byte for byte. `clientsFor(rpcUrl), send(clients, request), CLEAR_GAS_LIMIT (web/src/chain/client.ts)`: `live.ts` keeps importing `type Clients, clientsFor` from it.
+`useLive, ChainNotice, selectTrader, useSelectedTrader, errorName, TRADER_NOTE (web/src/app/shared.tsx); island registry islands (web/src/app/islands.tsx)`: `ChainNotice` (unchanged) renders, for a live state, `live.stale ? <p className="chain-notice" data-state="stale">Data is {formatAge(Date.now() - s.seenAt)}: the chain stopped answering.</p> : null`, and for every state that is not live a `.chain-notice` with `data-state` `loading`, `unavailable` or `not-deployed`. The hero renders `<div className="batch-live">` inside `[data-island="batch"]` once it has live data.
+`deployAll, fundTraders, seedDemo, demoOrder, advanceTo (web/scripts/lib/deploy.ts), startAnvil, rpcReady (web/scripts/lib/anvil.ts), deployLocal(rpcUrl?, outFile?, batchSeconds?) (web/scripts/deploy-local.ts)`: the idle check uses `startAnvil(port): Promise<{ rpcUrl: string; stop(): Promise<void> }>` and `deployLocal(rpcUrl, outFile, batchSeconds)` (it runs `fe build`, deploys, funds the traders, seeds the demo state and writes `outFile`). Also used, from files no task lists as an interface: `runChecked(command: string, args: readonly string[], options?: { cwd?: string }): Promise<string>` (`web/scripts/lib/proc.ts`, argument arrays, never a shell) and `WEB_DIR: string` (`web/scripts/lib/repo.ts`). `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)` is the gate.
+
+- [ ] **Step 3: Write the failing tests**
+In `web/src/chain/state.test.ts`, replace the import line
+```ts
+import { RECOVERY, batchPhase, classify, isStale, secondsLeft } from './state'
+```
+with
+```ts
+import { type ChainState, RECOVERY, batchPhase, classify, isStale, nextChainState, secondsLeft } from './state'
+```
+and insert this block directly above the line `describe('batchPhase', () => {` (every existing test stays as it is):
+```ts
+describe('nextChainState', () => {
+  const answer = (block: bigint) => ({ chainId: 31337, hasCode: true, address: '0xabc', block, blockTime: 100 })
+  const down = { error: 'fetch failed' }
+
+  it('keeps an idle chain live: a poll that answers with the same block is fresh data', () => {
+    let s: ChainState = { kind: 'loading' }
+    for (let t = 0; t <= 30_000; t += 2000) {
+      s = nextChainState(s, answer(7n), t)
+      expect(isStale(s, t + 1999)).toBe(false)
+    }
+    expect(s).toEqual({ kind: 'live', block: 7n, blockTime: 100, seenAt: 30_000 })
+  })
+
+  it('takes a new block', () => {
+    const first = nextChainState({ kind: 'loading' }, answer(7n), 0)
+    expect(nextChainState(first, answer(8n), 2000)).toEqual({ kind: 'live', block: 8n, blockTime: 100, seenAt: 2000 })
+  })
+
+  it('measures staleness from the last answered poll, so an RPC that stops answering goes stale', () => {
+    const live = nextChainState({ kind: 'loading' }, answer(7n), 0)
+    expect(isStale(nextChainState(live, down, 4000), 6000)).toBe(false)
+    expect(isStale(nextChainState(live, down, 6000), 6001)).toBe(true)
+  })
+
+  it('rides out a dropped poll, then reports an unreachable RPC with its recovery action', () => {
+    const live = nextChainState({ kind: 'loading' }, answer(7n), 0)
+    expect(nextChainState(live, down, 2000)).toBe(live)
+    expect(nextChainState(live, down, 6000)).toBe(live)
+    expect(nextChainState(live, down, 8000)).toEqual({ kind: 'unavailable', reason: 'unreachable', detail: 'fetch failed' })
+  })
+
+  it('reports at once an RPC that never answered, a wrong chain and a missing contract', () => {
+    expect(nextChainState({ kind: 'loading' }, down, 0)).toEqual({ kind: 'unavailable', reason: 'unreachable', detail: 'fetch failed' })
+    const live = nextChainState({ kind: 'loading' }, answer(7n), 0)
+    expect(nextChainState(live, { chainId: 1 }, 2000)).toMatchObject({ kind: 'unavailable', reason: 'wrong-chain' })
+    expect(nextChainState(live, { chainId: 31337, hasCode: false, address: '0xabc' }, 2000)).toEqual({ kind: 'not-deployed', address: '0xabc' })
+  })
+})
+```
+
+- [ ] **Step 4: Run to confirm they fail**
+Run: `NO_COLOR=1 pnpm -C web test`
+Expected: FAIL: the five `nextChainState > ...` tests fail with `(0 , nextChainState) is not a function`; the 23 existing tests pass.
+
+- [ ] **Step 5: `nextChainState` in state.ts**
+In `web/src/chain/state.ts`, replace exactly this block
+```ts
+/** Live data is stale after three missed polls. */
+export function isStale(state: ChainState, now: number, pollMs = POLL_MS): boolean {
+  return state.kind === 'live' && now - state.seenAt > 3 * pollMs
+}
+```
+with
+```ts
+/** Live data is stale after three polls without an answer: `seenAt` is the last poll the RPC answered. */
+export function isStale(state: ChainState, now: number, pollMs = POLL_MS): boolean {
+  return state.kind === 'live' && now - state.seenAt > 3 * pollMs
+}
+
+/**
+ * The state after one poll. Staleness is measured from the last poll the RPC
+ * answered, never from the last new block: Anvil mines only on transactions,
+ * so an idle chain answers with the same block and is still live. A poll that
+ * fails while live data is on screen keeps that data until it would be stale
+ * (one dropped poll does not flash "unavailable"); after that, and whenever
+ * nothing live is on screen, the failure shows at once with its recovery action.
+ */
+export function nextChainState(prev: ChainState, probe: Probe, now: number, pollMs = POLL_MS): ChainState {
+  const next = classify(probe, now)
+  const unreachable = next.kind === 'unavailable' && next.reason === 'unreachable'
+  if (unreachable && prev.kind === 'live' && !isStale(prev, now, pollMs)) return prev
+  return next
+}
+```
+Measured by the architect: a `nextChainState` that keeps the old state while the block number is unchanged (the defect) fails exactly the first new test, on `expected true to be false`.
+
+- [ ] **Step 6: `useChain` folds every poll through `nextChainState`**
+In `web/src/app/live.ts`, replace the import line
+```ts
+import { type ChainState, POLL_MS, classify, isStale } from '../chain/state'
+```
+with
+```ts
+import { type ChainState, POLL_MS, type Probe, isStale, nextChainState } from '../chain/state'
+```
+and replace the whole `useChain` function, from its one-line doc comment (it starts `/** Polls the RPC;`) to the function's closing `}`, with exactly:
+```ts
+/**
+ * Polls the RPC every POLL_MS. Every answered poll refreshes the data's age,
+ * even with no new block (an idle Anvil mines nothing). `stale` turns on after
+ * three polls without an answer: the clock ticks on every poll, so an RPC that
+ * hangs shows as stale before its request times out.
+ */
+export function useChain(deployment: Deployment | undefined, clients: Clients | undefined): { state: ChainState; stale: boolean } {
+  const [state, setState] = useState<ChainState>({ kind: 'loading' })
+  const [now, setNow] = useState(() => Date.now())
+  const last = useRef<ChainState>(state)
+  useEffect(() => {
+    if (!deployment || !clients) return
+    let stopped = false
+    const probe = async () => {
+      let result: Probe
+      try {
+        const [chainId, code, block] = await Promise.all([
+          clients.public.getChainId(),
+          clients.public.getCode({ address: deployment.addresses.anyOrder }),
+          clients.public.getBlock({ blockTag: 'latest' }),
+        ])
+        result = { chainId, hasCode: code !== undefined && code !== '0x', address: deployment.addresses.anyOrder, block: block.number, blockTime: Number(block.timestamp) }
+      } catch (e) {
+        result = { error: e instanceof Error ? e.message : String(e) }
+      }
+      if (stopped) return
+      const at = Date.now()
+      last.current = nextChainState(last.current, result, at)
+      setState(last.current)
+      setNow(at)
+    }
+    void probe()
+    const timer = setInterval(() => {
+      setNow(Date.now())
+      void probe()
+    }, POLL_MS)
+    return () => {
+      stopped = true
+      clearInterval(timer)
+    }
+  }, [deployment, clients])
+  return { state, stale: isStale(state, now) }
+}
+```
+
+- [ ] **Step 7: Run the unit tests and the type check**
+Run: `pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test`
+Expected: no tsc output, then `Tests  28 passed (28)`
+
+- [ ] **Step 8: The headless Chrome helper**
+Write `web/scripts/lib/chrome.ts` with exactly this content (Task 12 reuses it):
+```ts
+/**
+ * Headless Chrome for the repo's own browser checks, launched the way the
+ * design skill's checker launches it: the same executable search (CHROME_PATH,
+ * then Chrome, then Edge), the same flags (WebGL on the CPU), a temp profile of
+ * its own, closed by its own PID. Driven over the DevTools protocol with
+ * Node 22's built-in WebSocket. `serveDir` serves a built folder on 127.0.0.1,
+ * because Chrome runs no module script from file://.
+ */
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { tmpdir } from 'node:os'
+import { extname, join, resolve, sep } from 'node:path'
+
+export function findChrome(): string | null {
+  const env = process.env.CHROME_PATH
+  if (env && existsSync(env)) return env
+  const local = process.env.LOCALAPPDATA ?? ''
+  const pf = process.env.PROGRAMFILES ?? 'C:\\Program Files'
+  const pf86 = process.env['PROGRAMFILES(X86)'] ?? 'C:\\Program Files (x86)'
+  const list = [
+    join(pf, 'Google/Chrome/Application/chrome.exe'),
+    join(pf86, 'Google/Chrome/Application/chrome.exe'),
+    join(local, 'Google/Chrome/Application/chrome.exe'),
+    join(pf86, 'Microsoft/Edge/Application/msedge.exe'),
+    join(pf, 'Microsoft/Edge/Application/msedge.exe'),
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ]
+  return list.find((c) => existsSync(c)) ?? null
+}
+
+const FLAGS = [
+  '--headless=new',
+  '--remote-debugging-port=0',
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--mute-audio',
+  '--hide-scrollbars',
+  '--disable-background-timer-throttling',
+  '--disable-renderer-backgrounding',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-features=Translate,MediaRouter',
+  '--force-color-profile=srgb',
+  '--disable-gpu',
+  '--use-angle=swiftshader',
+  '--enable-unsafe-swiftshader',
+]
+
+export interface Page {
+  send<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>
+  /** Evaluates an expression in the page (awaiting a returned promise) and returns its JSON value. */
+  evaluate<T>(expression: string): Promise<T>
+  /** Navigates and resolves once the load event has fired. */
+  goto(url: string): Promise<void>
+}
+
+export interface Browser {
+  page: Page
+  close(): Promise<void>
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/** Starts headless Chrome with one page of `width` x `height` CSS pixels at device scale 1. */
+export async function launchChrome(width: number, height: number): Promise<Browser> {
+  const exe = findChrome()
+  if (!exe) throw new Error('no Chrome, Edge or Chromium found; set CHROME_PATH')
+  const profile = mkdtempSync(join(tmpdir(), 'anyorder-chrome-'))
+  const child = spawn(exe, [...FLAGS, `--user-data-dir=${profile}`, `--window-size=${width},${height}`, 'about:blank'], {
+    shell: false,
+    windowsHide: true,
+    stdio: 'ignore',
+  })
+  const kill = () => {
+    if (child.pid !== undefined && child.exitCode === null) {
+      if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+      else child.kill('SIGKILL')
+    }
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    } catch {
+      // Chrome's helpers can hold the profile a moment longer; the OS temp folder is cleaned later.
+    }
+  }
+  try {
+    const portFile = join(profile, 'DevToolsActivePort')
+    for (let i = 0; i < 100 && !existsSync(portFile); i++) await sleep(150)
+    if (!existsSync(portFile)) throw new Error('Chrome did not open its DevTools port')
+    const port = Number(readFileSync(portFile, 'utf8').split('\n')[0])
+    const targets = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()) as { type: string; webSocketDebuggerUrl: string }[]
+    const target = targets.find((t) => t.type === 'page')
+    if (!target) throw new Error('Chrome opened no page')
+    const ws = new WebSocket(target.webSocketDebuggerUrl)
+    await new Promise<void>((ok, fail) => {
+      ws.addEventListener('open', () => ok(), { once: true })
+      ws.addEventListener('error', () => fail(new Error('DevTools socket failed')), { once: true })
+    })
+    let nextId = 0
+    const pending = new Map<number, { ok: (v: unknown) => void; fail: (e: Error) => void }>()
+    const events = new Map<string, (() => void)[]>()
+    ws.addEventListener('close', () => {
+      for (const call of pending.values()) call.fail(new Error('DevTools socket closed'))
+      pending.clear()
+    })
+    ws.addEventListener('message', (message: MessageEvent) => {
+      const data = JSON.parse(String(message.data)) as { id?: number; result?: unknown; error?: { message: string }; method?: string }
+      if (data.id !== undefined) {
+        const call = pending.get(data.id)
+        pending.delete(data.id)
+        if (data.error) call?.fail(new Error(data.error.message))
+        else call?.ok(data.result)
+      } else if (data.method !== undefined) {
+        const waiting = events.get(data.method) ?? []
+        events.delete(data.method)
+        for (const w of waiting) w()
+      }
+    })
+    const send = <T = unknown>(method: string, params: Record<string, unknown> = {}): Promise<T> =>
+      new Promise<T>((ok, fail) => {
+        const id = ++nextId
+        pending.set(id, { ok: ok as (v: unknown) => void, fail })
+        ws.send(JSON.stringify({ id, method, params }))
+      })
+    const once = (method: string) => new Promise<void>((ok) => events.set(method, [...(events.get(method) ?? []), ok]))
+    await send('Page.enable')
+    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
+    const page: Page = {
+      send,
+      async evaluate<T>(expression: string): Promise<T> {
+        const r = await send<{ result: { value?: unknown }; exceptionDetails?: { text: string } }>('Runtime.evaluate', {
+          expression,
+          awaitPromise: true,
+          returnByValue: true,
+        })
+        if (r.exceptionDetails) throw new Error(`page script failed: ${r.exceptionDetails.text}`)
+        return r.result.value as T
+      },
+      async goto(url: string): Promise<void> {
+        const loaded = once('Page.loadEventFired')
+        await send('Page.navigate', { url })
+        await loaded
+      },
+    }
+    return {
+      page,
+      close: async () => {
+        // Chrome may exit without answering Browser.close: wait at most 2 s, then kill it by its PID.
+        await Promise.race([send('Browser.close').catch(() => undefined), sleep(2000)])
+        ws.close()
+        await sleep(300)
+        kill()
+      },
+    }
+  } catch (error) {
+    kill()
+    throw error
+  }
+}
+
+const TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.woff2': 'font/woff2',
+  '.txt': 'text/plain; charset=utf-8',
+}
+
+/** Serves `root` read-only on 127.0.0.1 at a free port; a folder serves its index.html. */
+export async function serveDir(root: string): Promise<{ url: string; close(): Promise<void> }> {
+  const base = resolve(root)
+  const server = createServer((req, res) => {
+    let file = resolve(base, `.${decodeURIComponent(new URL(req.url ?? '/', 'http://127.0.0.1').pathname)}`)
+    if (file !== base && !file.startsWith(base + sep)) {
+      res.writeHead(403).end()
+      return
+    }
+    if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html')
+    if (!existsSync(file)) {
+      res.writeHead(404).end()
+      return
+    }
+    res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' })
+    res.end(readFileSync(file))
+  })
+  await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok))
+  const { port } = server.address() as AddressInfo
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: () =>
+      new Promise<void>((ok) => {
+        server.close(() => ok())
+        server.closeAllConnections()
+      }),
+  }
+}
+```
+
+- [ ] **Step 9: The idle-chain check**
+Write `web/scripts/idle-check.ts` with exactly this content:
+```ts
+/**
+ * dapp:11's check on a real idle chain. Builds dist/, deploys to its own Anvil
+ * (127.0.0.1:8547, one-hour batches, so nothing is mined while it waits; a dev
+ * chain on 8545 is never touched) and opens the built /app in headless Chrome.
+ *
+ *   1. The hero must show live data within 30 s.
+ *   2. For 30 s no transaction is sent: the chain answers every poll with the
+ *      same block. Sampled every second, no island may show any chain notice
+ *      (stale, loading, unavailable, not deployed).
+ *   3. Anvil is stopped: within 20 s the page must say the chain is unavailable.
+ *
+ *   pnpm -C web exec tsx scripts/idle-check.ts
+ *   last line: IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)
+ */
+import { join } from 'node:path'
+import { startAnvil } from './lib/anvil'
+import { launchChrome, serveDir } from './lib/chrome'
+import { runChecked } from './lib/proc'
+import { WEB_DIR } from './lib/repo'
+import { deployLocal } from './deploy-local'
+
+const IDLE_SECONDS = 30
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+interface View {
+  live: boolean
+  notices: string[]
+}
+
+const READ = `(() => ({
+  live: document.querySelector('[data-island="batch"] .batch-live') !== null,
+  notices: [...document.querySelectorAll('.chain-notice')].map((n) => n.getAttribute('data-state') ?? '?'),
+}))()`
+
+async function main(): Promise<boolean> {
+  await runChecked(process.execPath, [join(WEB_DIR, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit'], { cwd: WEB_DIR })
+  await runChecked(process.execPath, [join(WEB_DIR, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'], { cwd: WEB_DIR })
+  const anvil = await startAnvil(8547)
+  let anvilUp = true
+  const server = await serveDir(join(WEB_DIR, 'dist'))
+  const browser = await launchChrome(1440, 900)
+  try {
+    await deployLocal(anvil.rpcUrl, join(WEB_DIR, 'dist', 'deployment.json'), 3600)
+    const rpc = async (method: string): Promise<string> => {
+      const r = await fetch(anvil.rpcUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: [] }) })
+      return ((await r.json()) as { result: string }).result
+    }
+    await browser.page.goto(`${server.url}/app/`)
+    let view: View = { live: false, notices: [] }
+    for (let i = 0; i < 60 && !(view.live && view.notices.length === 0); i++) {
+      await sleep(500)
+      view = await browser.page.evaluate<View>(READ)
+    }
+    if (!view.live) {
+      console.log(`IDLE: FAIL (the hero never went live; notices: ${view.notices.join(', ') || 'none'})`)
+      return false
+    }
+    const startBlock = await rpc('eth_blockNumber')
+    console.log(`live at block ${Number(startBlock)}; idling ${IDLE_SECONDS} s`)
+    for (let s = 1; s <= IDLE_SECONDS; s++) {
+      await sleep(1000)
+      view = await browser.page.evaluate<View>(READ)
+      if (!view.live || view.notices.length > 0) {
+        console.log(`IDLE: FAIL (after ${s} s idle: live=${String(view.live)}, notices: ${view.notices.join(', ') || 'none'})`)
+        return false
+      }
+    }
+    const endBlock = await rpc('eth_blockNumber')
+    if (endBlock !== startBlock) {
+      console.log(`IDLE: FAIL (the chain was not idle: block ${Number(startBlock)} -> ${Number(endBlock)})`)
+      return false
+    }
+    console.log(`${IDLE_SECONDS} s idle at block ${Number(endBlock)}: live, no chain notice`)
+    await anvil.stop()
+    anvilUp = false
+    for (let s = 1; s <= 20; s++) {
+      await sleep(1000)
+      view = await browser.page.evaluate<View>(READ)
+      if (view.notices.includes('unavailable')) {
+        console.log(`RPC stopped: unavailable after ${s} s`)
+        console.log(`IDLE: OK (${IDLE_SECONDS} s idle: live, no stale notice; RPC stopped: unavailable)`)
+        return true
+      }
+    }
+    console.log(`IDLE: FAIL (20 s after the RPC stopped the page shows: ${view.notices.join(', ') || 'no notice'})`)
+    return false
+  } finally {
+    await browser.close()
+    await server.close()
+    if (anvilUp) await anvil.stop()
+  }
+}
+
+main()
+  .then((ok) => process.exit(ok ? 0 : 1))
+  .catch((error: unknown) => {
+    console.log(`IDLE: ERROR (${error instanceof Error ? error.message.split('\n')[0] : String(error)})`)
+    process.exit(2)
+  })
+```
+
+- [ ] **Step 10: Verify against a real idle Anvil**
+This is how the fix is proven on a real chain. The script builds `dist/`, starts its own Anvil on 8547 (one-hour batches, so nothing is mined), deploys and seeds, and opens the built `/app` in headless Chrome. It waits until the hero is live, then idles 30 s with no transaction, sampling every second: no island may show a chain notice, and the block number must not move. Then it stops Anvil, and within 20 s the page must show the `unavailable` notice. It takes about 1.5 minutes.
+Run: `pnpm -C web exec tsx scripts/idle-check.ts`
+Expected: `live at block 56; idling 30 s`, `30 s idle at block 56: live, no chain notice`, `RPC stopped: unavailable after 7 s` (the block and the seconds may differ by a little), and last `IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)`. Measured by the architect on the unfixed code: `IDLE: FAIL (after 4 s idle: live=true, notices: stale, stale)`, exit code 1.
+
+- [ ] **Step 11: Gate: types, unit tests, the idle check, then the skill's finish gate on /app**
+The gate re-runs the idle check, so the orchestrator proves the fix on a real idle chain itself. Fix every FAIL the skill's gate lists and run it again (three rounds at most, counted by the gate). Then report the `GATE:` line, every waiver with its reason (none for `kit-edited`), and each section 5 checklist line of SKILL.md with the check ids that cover it. Measured by the architect with this exact code: `GATE: PASS`, no waiver, and `fade-cut` PASS (the false stale notice had caused a `fade-cut` WARN).
+Run: `pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test && pnpm -C web exec tsx scripts/idle-check.ts && pnpm -C web ui-gate app`
+Expected: PASS — `GATE: PASS`
+
+- [ ] **Step 12: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `fix(dapp): staleness is measured from the last answered poll, not the last new block`
+
+---
+
+### Task 12: UI polish (cut first): link-preview image from the real landing page
+
+**Files:**
+- Create: `web/scripts/share-image.ts`
+- Create: `web/public/share.jpg`
+- Modify: `web/index.html`
+
+**Depends on:** Task 11, Task docs:4
+**Effort:** medium
+**Model tier:** top
+**Provides:** `web/public/share.jpg (1200x630 still of the built landing page) + pnpm -C web exec tsx scripts/share-image.ts [--check] -> last line SHARE: OK 1200x630 <bytes> bytes`
+**Requires:** `findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)`, `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)`
+
+- [ ] **Step 1: Read the skill first**
+Read `~/.claude/skills/design-taste-frontend/SKILL.md` in full, then the references named in this plan's conventions. The skill's `references/system.md` (Head) wants `og:image` to be a still of the page's own hero, and this task makes exactly that. **Do not change the page's visual design**: no markup in `<body>`, no CSS, no copy; the only change to `web/index.html` is the five meta lines below. Never edit a kit file, never add a waiver for `kit-edited`. This task is the first to cut if the schedule slips. It depends on docs:4 only so that it runs last.
+
+- [ ] **Step 2: Context**
+The landing page's `<head>` already has `og:type`, `og:title` (`AnyOrder: a batch-auction exchange for Ethereum traders`), `og:description` (`One clearing price per batch, computed by the contract, whatever order the transactions arrive in.`) and `twitter:card` = `summary_large_image`. They stay exactly as they are; only `og:image` is missing (the skill's `share-meta` check WARNs on it). Upstream helper, from Task 11 (`findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)`):
+```ts
+export function findChrome(): string | null
+export interface Page {
+  send<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>
+  evaluate<T>(expression: string): Promise<T>
+  goto(url: string): Promise<void>
+}
+export interface Browser { page: Page; close(): Promise<void> }
+export async function launchChrome(width: number, height: number): Promise<Browser>
+export async function serveDir(root: string): Promise<{ url: string; close(): Promise<void> }>
+```
+It finds Chrome the way the skill's checker does, starts it with the same headless flags, and drives it over the DevTools protocol, with child-process arguments passed as arrays (the repo path contains a space). Also used: `runChecked` from `web/scripts/lib/proc.ts` and `WEB_DIR` from `web/scripts/lib/repo.ts` (signatures in Task 11, Step 2). `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)` is the gate.
+
+The domain is not known yet (the page's own `<!-- <link rel="canonical" ...> once a domain exists -->` comment says so), so `og:image` is the root-relative `/share.jpg`. Some link-preview crawlers need an absolute URL; it becomes `https://<domain>/share.jpg` when a domain exists, which is not this task.
+
+- [ ] **Step 3: The capture script**
+Write `web/scripts/share-image.ts` with exactly this content:
+```ts
+/**
+ * dapp:12: the link-preview image is a still of the real built landing page.
+ * Builds dist/, serves it on 127.0.0.1, opens / in headless Chrome launched the
+ * way the design skill's gate launches it (scripts/lib/chrome.ts), lays the
+ * page out at 1440 x 756 (the desktop width the gate judges, at 1200 x 630's
+ * ratio), waits for the fonts and the hero's entrance, and captures the first
+ * screen scaled to 1200 x 630 as JPEG into public/share.jpg, lowering the
+ * quality in steps until the file is under 300 KB. Nothing is drawn or
+ * generated: the pixels are the page's.
+ *
+ *   pnpm -C web exec tsx scripts/share-image.ts           capture, then check
+ *   pnpm -C web exec tsx scripts/share-image.ts --check   check the committed image and meta only
+ *   last line: SHARE: OK 1200x630 <bytes> bytes
+ */
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { launchChrome, serveDir } from './lib/chrome'
+import { runChecked } from './lib/proc'
+import { WEB_DIR } from './lib/repo'
+
+const OUT = join(WEB_DIR, 'public', 'share.jpg')
+const MAX_BYTES = 300 * 1024
+const WIDTH = 1200
+const HEIGHT = 630
+const LAYOUT_WIDTH = 1440
+const LAYOUT_HEIGHT = 756
+const SETTLE_MS = 4000
+
+/** Width and height from a JPEG's start-of-frame segment, or null when the bytes are not a JPEG. */
+function jpegSize(buf: Buffer): { width: number; height: number } | null {
+  if (buf[0] !== 0xff || buf[1] !== 0xd8) return null
+  let i = 2
+  while (i + 9 < buf.length) {
+    if (buf[i] !== 0xff) return null
+    const marker = buf[i + 1] ?? 0
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) {
+      i += 2
+      continue
+    }
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) }
+    }
+    i += 2 + buf.readUInt16BE(i + 2)
+  }
+  return null
+}
+
+const META = [
+  '<meta property="og:title" content="',
+  '<meta property="og:description" content="',
+  '<meta property="og:image" content="/share.jpg">',
+  '<meta property="og:image:width" content="1200">',
+  '<meta property="og:image:height" content="630">',
+  '<meta name="twitter:card" content="summary_large_image">',
+  '<meta name="twitter:image" content="/share.jpg">',
+]
+
+function check(): boolean {
+  if (!existsSync(OUT)) {
+    console.log('SHARE: FAIL (web/public/share.jpg is missing)')
+    return false
+  }
+  const buf = readFileSync(OUT)
+  const size = jpegSize(buf)
+  if (!size || size.width !== WIDTH || size.height !== HEIGHT) {
+    console.log(`SHARE: FAIL (share.jpg is ${size ? `${size.width}x${size.height}` : 'not a JPEG'}, want ${WIDTH}x${HEIGHT})`)
+    return false
+  }
+  if (buf.length >= MAX_BYTES) {
+    console.log(`SHARE: FAIL (share.jpg is ${buf.length} bytes, want under ${MAX_BYTES})`)
+    return false
+  }
+  const html = readFileSync(join(WEB_DIR, 'index.html'), 'utf8')
+  const missing = META.filter((m) => !html.includes(m))
+  if (missing.length > 0) {
+    console.log(`SHARE: FAIL (web/index.html lacks ${missing.join(' ')})`)
+    return false
+  }
+  console.log(`SHARE: OK ${size.width}x${size.height} ${buf.length} bytes`)
+  return true
+}
+
+async function capture(): Promise<void> {
+  await runChecked(process.execPath, [join(WEB_DIR, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit'], { cwd: WEB_DIR })
+  await runChecked(process.execPath, [join(WEB_DIR, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'], { cwd: WEB_DIR })
+  const server = await serveDir(join(WEB_DIR, 'dist'))
+  const browser = await launchChrome(LAYOUT_WIDTH, LAYOUT_HEIGHT)
+  try {
+    await browser.page.goto(`${server.url}/`)
+    await browser.page.evaluate('document.fonts.ready.then(() => true)')
+    await new Promise((r) => setTimeout(r, SETTLE_MS))
+    const clip = { x: 0, y: 0, width: LAYOUT_WIDTH, height: LAYOUT_HEIGHT, scale: WIDTH / LAYOUT_WIDTH }
+    for (const quality of [86, 80, 74, 68, 62, 56, 50]) {
+      const shot = await browser.page.send<{ data: string }>('Page.captureScreenshot', { format: 'jpeg', quality, clip })
+      const buf = Buffer.from(shot.data, 'base64')
+      if (buf.length < MAX_BYTES) {
+        writeFileSync(OUT, buf)
+        console.log(`captured / at ${LAYOUT_WIDTH}x${LAYOUT_HEIGHT}, quality ${quality}`)
+        return
+      }
+    }
+    throw new Error('no quality down to 50 brought share.jpg under 300 KB')
+  } finally {
+    await browser.close()
+    await server.close()
+  }
+}
+
+async function main(): Promise<boolean> {
+  if (!process.argv.includes('--check')) await capture()
+  return check()
+}
+
+main()
+  .then((ok) => process.exit(ok ? 0 : 1))
+  .catch((error: unknown) => {
+    console.log(`SHARE: ERROR (${error instanceof Error ? error.message.split('\n')[0] : String(error)})`)
+    process.exit(2)
+  })
+```
+
+- [ ] **Step 4: Confirm the check fails before the image exists**
+Run: `pnpm -C web exec tsx scripts/share-image.ts --check`
+Expected: FAIL: `SHARE: FAIL (web/public/share.jpg is missing)`
+
+- [ ] **Step 5: Capture the image from the real built page**
+Run: `pnpm -C web exec tsx scripts/share-image.ts`
+Expected: `captured / at 1440x756, quality 86`, then `SHARE: FAIL (web/index.html lacks ...)`, because the meta lines come in Step 6. Then open `web/public/share.jpg` with your Read tool and look at it. It must show the landing hero as a visitor sees it: the nav (AnyOrder, Clearing, Sandwich, Fe, Evidence, Open the app), the headline "A one-price batch exchange for Ethereum traders", the lead, the button and the recorded-run panel, with nothing blank or half faded in. If the hero's entrance had not finished, run the capture again. Measured by the architect: 84112 bytes at quality 86.
+
+- [ ] **Step 6: The meta lines**
+In `web/index.html`, directly after the line `<meta name="twitter:card" content="summary_large_image">`, insert exactly:
+```html
+<meta property="og:image" content="/share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AnyOrder landing page: a one-price batch exchange for Ethereum traders, beside a recorded cleared batch.">
+<meta name="twitter:image" content="/share.jpg">
+```
+
+- [ ] **Step 7: Gate: the committed image and meta, then the skill's finish gate on /**
+`--check` verifies the committed file and never recaptures (a capture's bytes differ run to run, because the hero's effect is live). Fix every FAIL the skill's gate lists and run it again (three rounds at most). Then report the `GATE:` line, every waiver with its reason (none for `kit-edited`), and each section 5 checklist line of SKILL.md with the check ids that cover it. Measured by the architect with this exact code: `SHARE: OK 1200x630 84112 bytes`, `GATE: PASS`, no waiver, `share-meta` PASS.
+Run: `pnpm -C web exec tsx scripts/share-image.ts --check && pnpm -C web ui-gate landing`
+Expected: PASS — `GATE: PASS`
+
+- [ ] **Step 8: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `feat(dapp): link-preview image captured from the real landing page`

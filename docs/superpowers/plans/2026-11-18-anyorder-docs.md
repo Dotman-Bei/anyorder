@@ -4,10 +4,12 @@
 **Architecture:** README.md follows the kit's R2-contract-protocol v1 schema with the event overlay
 (the starter's SUBMISSION.md headings R2 lacks); SUBMISSION.md keeps the starter's exact structure.
 Every number is one the tests assert or the recording shows.
-**Tech Stack:** Markdown; PowerShell 5.1 for the conformance gates; fe 26.6.0 for the version line.
+**Tech Stack:** Markdown; PowerShell 5.1 for the conformance gates of Tasks 1-2; Git Bash (bash 5, GNU awk,
+git grep) for the gates of Tasks 3-4; fe 26.6.0 for the version line.
 **Source spec:** docs/superpowers/specs/2026-11-18-anyorder-docs-stretch-design.md
 
-Conventions: the gates in this plan are PowerShell 5.1 one-liners: run them with PowerShell from the
+Conventions: the gates of Tasks 1 and 2 are PowerShell 5.1 one-liners, and the gates of Tasks 3 and 4
+are Git Bash (added 2026-11-19 as follow-up tasks; each gate step says which shell). Run PowerShell gates from the
 repository root, not Git Bash. Other `Run:` lines are Git Bash. Cross-plan dependencies are written
 `Task <subsystem>:<N>`. Never write the private submission code anywhere.
 
@@ -50,7 +52,7 @@ Write `README.md` from the specs and what the tests assert. Line 1 is exactly `<
 - `## License`
 
 What goes under each (sources: core spec sections 5, 6, 7, 8, 10, 11, 12; dApp spec; docs spec):
-- **# AnyOrder** + one line: "A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so sandwich attacks have nothing to exploit." Optional CI badge.
+- **# AnyOrder** + one line: "A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit." (wording revised 2026-11-19 by Task 4) Optional CI badge.
 - **Demo:** the money shot (`fe test --filter sandwich`, `fe test --filter permutation`) with their real output, the core spec section 6 table, the one-command local run that opens `/app`, and the line `TBD-post-build:demo-video-url` (Step 2.5 may record a video; the closing pass resolves or removes the line). Add no image files in this task. State the recording's date and commit from `web/public/recorded/sandwich.json`.
 - **What it does:** problem -> solution in 3-6 plain sentences.
 - **Quickstart:** `fe --version` (expect `fe 26.6.0 (5b3f96a)`), `fe test --filter sandwich`, `fe test --filter permutation`, `pnpm -C web install`, `pnpm -C web local`.
@@ -97,3 +99,265 @@ Expected: PASS — `PASS`
 The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
 those paths with this message. The executor never runs git.
 Message: `docs: SUBMISSION.md for the jury`
+
+---
+
+### Task 3: One gas story in the README and spec §9
+
+**Files:**
+- Create: `scripts/check-gas-story.sh`
+- Modify: `README.md`
+- Modify: `docs/superpowers/specs/2026-11-18-anyorder-core-design.md`
+
+**Depends on:** Task stretch:1
+**Effort:** low
+**Provides:** `bash scripts/check-gas-story.sh -> last line GAS-STORY: OK`
+**Requires:** `README.md (R2-contract-protocol v1 + event-overlay)`
+
+- [ ] **Step 1: Context**
+Edits `README.md (R2-contract-protocol v1 + event-overlay)` (its `#`/`##` headings are locked: add or remove none) and section 9 of the core design spec. Three sets of `clear()` gas measurements are quoted today, and two of them conflict at first sight. All ran on `anvil --hardfork osaka --enable-tx-gas-limit` (cap 16,777,216):
+1. **The gas spike** (`spikes/gas`, a prototype in the planned storage shape that writes a fill for every order, the worst case). The architect measured it, and core task 2 measured it again with `bash scripts/gas-spike.sh`: 409,402 / 2,161,907 / 4,426,468 gas at 10 / 50 / 100 orders. It set `maxOrders = 100`.
+2. **The architect's planning measurement** of the verified contract code, before the build: 333,508 / 1,446,094 / 2,809,751 gas at 10 / 50 / 100 orders. **Which orders were placed was not recorded**: the architect searched the repository, its history and the planning session's scratch files on 2026-11-19 and found only the figures. Say exactly that; never invent an order mix for it.
+3. **The gas table** (stretch task S1, `pnpm -C web exec tsx scripts/gas-table.ts`, `docs/gas.md`): the deployed contract with the demo order mix (limits 0.009-0.014 ETH per token, 1-4 tokens per order, three makers): 358462 / 807348 / 1567284 / 2380590 / 3156298 gas at 10 / 25 / 50 / 75 / 100 orders. The end-to-end test `web/test/e2e/lifecycle.e2e.test.ts` clears `maxOrders` orders of the same mix (`demoOrder`), so it measures the same 3,156,298.
+
+The figures differ because they measured different things: `clear()` gas grows with the order count and with the number of non-zero fills, each one a storage write. Every gas figure gets one of three exact labels, and the check script enforces it:
+- `gas spike (prototype, every order filled)`
+- `architect's planning measurement (real contract, order mix not recorded)`
+- `gas table (real contract, demo order mix)`
+
+`docs/gas.md` and `docs/gas/spike.md` stay as they are: each is one labelled measurement with its method.
+
+- [ ] **Step 2: The check script**
+Write `scripts/check-gas-story.sh` with exactly this content:
+```bash
+#!/usr/bin/env bash
+# docs:3 gate: one gas story. Every clear() gas figure in README.md and in
+# section 9 of the core design spec carries the label of the measurement it
+# comes from, and figures of a known set carry exactly their own set's label:
+#   gas spike (prototype, every order filled)
+#   architect's planning measurement (real contract, order mix not recorded)
+#   gas table (real contract, demo order mix)
+# A table row counts as labelled when the row itself or its table's header line
+# carries the label. The per-transaction cap (16,777,216) and the half-cap rule
+# (8,388,608) are limits, not measurements, and need no label. In README.md a
+# line is in scope when it lies under "### Gas" or contains the word "gas"; in
+# the spec, every line of section 9.
+#
+#   bash scripts/check-gas-story.sh      last line: GAS-STORY: OK
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+SPEC=docs/superpowers/specs/2026-11-18-anyorder-core-design.md
+
+check_file() {
+  awk -v file="$1" -v mode="$2" '
+    BEGIN {
+      SPIKE = "gas spike (prototype, every order filled)"
+      PLAN = "architect\047s planning measurement (real contract, order mix not recorded)"
+      TABLE = "gas table (real contract, demo order mix)"
+      split("409402 2161907 4426468", a, " "); for (i in a) set[a[i]] = SPIKE
+      split("333508 1446094 2809751", a, " "); for (i in a) set[a[i]] = PLAN
+      split("358462 807348 1567284 2380590 3156298", a, " "); for (i in a) set[a[i]] = TABLE
+      bad = 0; inGas = 0; inSec = 0; prevRow = 0; header = ""; seenPlan = 0; seenTable = 0
+    }
+    {
+      line = $0
+      row = (line ~ /^\|/)
+      if (row && !prevRow) header = line
+      if (!row) header = ""
+      prevRow = row
+      if (mode == "readme") {
+        if (line ~ /^### Gas$/) { inGas = 1 } else if (line ~ /^#/) { inGas = 0 }
+        scope = inGas || (tolower(line) ~ /(^|[^a-z-])gas([^a-z-]|$)/)
+      } else {
+        if (line ~ /^## 9\. Gas$/) { inSec = 1 } else if (line ~ /^## /) { inSec = 0 }
+        scope = inSec
+      }
+      if (!scope) next
+      text = tolower(line " " (row ? header : ""))
+      rest = line
+      while (match(rest, /[0-9]{1,3}(,[0-9]{3})+|[0-9]{6,}/)) {
+        fig = substr(rest, RSTART, RLENGTH); rest = substr(rest, RSTART + RLENGTH)
+        n = fig; gsub(/,/, "", n)
+        if (n == "16777216" || n == "8388608") continue
+        if (n in set) {
+          ok = index(text, set[n]) > 0
+          if (ok && n == "2809751") seenPlan = 1
+          if (ok && n == "3156298") seenTable = 1
+        } else {
+          ok = index(text, SPIKE) || index(text, PLAN) || index(text, TABLE)
+        }
+        if (!ok) { printf "UNLABELLED %s:%d: %s\n", file, NR, fig; bad = 1 }
+      }
+    }
+    END {
+      if (!seenPlan) { printf "MISSING %s: 2,809,751 with its label\n", file; bad = 1 }
+      if (!seenTable) { printf "MISSING %s: 3,156,298 with its label\n", file; bad = 1 }
+      exit bad
+    }
+  ' "$1"
+}
+
+status=0
+check_file README.md readme || status=1
+check_file "$SPEC" spec || status=1
+if [ "$status" -eq 0 ]; then echo 'GAS-STORY: OK'; else echo 'GAS-STORY: FAIL'; exit 1; fi
+```
+
+- [ ] **Step 3: Run it to confirm it fails on today's text**
+Run: `bash scripts/check-gas-story.sh`
+Expected: FAIL: 11 `UNLABELLED README.md:...` lines (README lines 147-161), 7 `UNLABELLED docs/superpowers/specs/...` lines (spec lines 250-254), 4 `MISSING ...` lines, and last `GAS-STORY: FAIL`.
+
+- [ ] **Step 4: README: the Gas sub-section and one row of the Build & test table**
+In `README.md`, replace everything from the line `### Gas` up to the blank line before `## Build & test` (that heading and everything after it stay) with exactly this text, followed by one blank line:
+```markdown
+### Gas
+
+Three sets of `clear()` measurements exist. All ran on `anvil --hardfork osaka --enable-tx-gas-limit` (per-transaction cap 16,777,216 gas), and they differ because they measured different things: `clear()` gas grows with the number of orders and with how many of them fill, since every non-zero fill is a storage write.
+
+**1. The gas spike (prototype, every order filled).** Measured before the contract existed, by the architect and again by core task 2 with `bash scripts/gas-spike.sh`. The prototype in `spikes/gas` stores orders in AnyOrder's planned storage shape and writes a fill for every order (the worst case). It sets the per-batch cap; the result is in `docs/gas/spike.md` and `deploy/params.json`.
+
+| Orders in the batch | `clear()` gas, gas spike (prototype, every order filled) | Share of the cap |
+|---:|---:|---:|
+| 10 | 409,402 | 2% |
+| 50 | 2,161,907 | 12% |
+| 100 | 4,426,468 | 26% |
+
+The rule: `maxOrders` is the largest measured N whose clearing used at most 8,388,608 gas (half the cap); that gives `maxOrders = 100`, and `demoBatchSize = 20` (the smaller of that and 20).
+
+**2. The architect's planning measurement (real contract, order mix not recorded).** During planning (2026-11-18) the architect cleared batches of 10 / 50 / 100 orders on the verified contract code and recorded the gas in the core design spec, section 9, but not which orders were placed: 333,508 / 1,446,094 / 2,809,751 gas. It shows the scale only; it is not comparable row by row with the gas table below, which used a known order mix.
+
+**3. The gas table (real contract, demo order mix).** These are the numbers to quote. Stretch task S1 measured the deployed contract with `pnpm -C web exec tsx scripts/gas-table.ts` and the demo order mix (limits 0.009-0.014 ETH per token, 1-4 tokens per order, three makers); full table and method in [`docs/gas.md`](docs/gas.md). The end-to-end test `pnpm -C web test:e2e` clears a full batch of `maxOrders` with the same mix under the cap and prints the gas it used.
+
+| Orders in the batch | `clear()` gas, gas table (real contract, demo order mix) | Share of the cap |
+|---:|---:|---:|
+| 10 | 358462 | 2.1% |
+| 25 | 807348 | 4.8% |
+| 50 | 1567284 | 9.3% |
+| 75 | 2380590 | 14.2% |
+| 100 | 3156298 | 18.8% |
+
+No gas-efficiency claim is made beyond these measured numbers.
+```
+Then, in the Build & test table, replace the row
+```markdown
+| `bash scripts/gas-spike.sh` | the clearing gas at N = 10, 50, 100 (table above) |
+```
+with
+```markdown
+| `bash scripts/gas-spike.sh` | the gas spike (prototype, every order filled) at N = 10, 50, 100 (under Security notes, Gas) |
+```
+
+- [ ] **Step 5: Spec §9**
+In `docs/superpowers/specs/2026-11-18-anyorder-core-design.md`, replace everything from the line `## 9. Gas` up to the blank line before `## 10. Evidence suite` with exactly this text, followed by one blank line:
+```markdown
+## 9. Gas
+
+All three sets of `clear()` measurements ran on `anvil --hardfork osaka --enable-tx-gas-limit`
+(per-transaction cap 16,777,216). `clear()` gas grows with the order count and with the number of
+non-zero fills (one storage write each), so the sets differ by what they measured.
+
+| Set | What it measured | Who measured, how | `clear()` gas at 10 / 50 / 100 orders |
+|---|---|---|---|
+| gas spike (prototype, every order filled) | `spikes/gas`: this storage shape, clears like AnyOrder, writes every fill (worst case) | the architect, then A task 2 with `bash scripts/gas-spike.sh` (`docs/gas/spike.md`) | 409,402 / 2,161,907 / 4,426,468 |
+| architect's planning measurement (real contract, order mix not recorded) | the verified contract code before the build; which orders were placed was not recorded | the architect, 2026-11-18 | 333,508 / 1,446,094 / 2,809,751 |
+| gas table (real contract, demo order mix) | the deployed contract with the demo order mix (limits 0.009-0.014 ETH per token, 1-4 tokens per order, three makers); also N = 25 and 75 in `docs/gas.md` | Stretch S1 with `pnpm -C web exec tsx scripts/gas-table.ts` | 358,462 / 1,567,284 / 3,156,298 |
+
+- **Rule (from the gas spike):** `maxOrders` = largest N with `clear()` ≤ 8,388,608 gas (half of
+  16,777,216); `demoBatchSize` = min(maxOrders, 20); written to `deploy/params.json`. Result:
+  maxOrders 100, demoBatchSize 20.
+- **Numbers to quote:** the gas table. The planning measurement shows scale only and is not
+  comparable row by row with it. B's end-to-end test clears a full batch of `maxOrders` with the
+  demo order mix under the cap and prints its gas, which matches the gas table's 100-order row.
+- No gas-efficiency claim is made beyond measured numbers.
+```
+
+- [ ] **Step 6: The README schema is intact (PowerShell, from the repository root)**
+Re-run Task 1's conformance one-liner (Task 1, Step 3) unchanged in PowerShell 5.1.
+Expected: the single line `PASS` (no `#`/`##` heading was added or removed)
+
+- [ ] **Step 7: Gate: every gas figure carries its label (Git Bash)**
+Run: `bash scripts/check-gas-story.sh`
+Expected: PASS — `GAS-STORY: OK`
+
+- [ ] **Step 8: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `docs: one gas story, every clear() figure labelled by what it measured`
+
+---
+
+### Task 4: Pitch wording that matches what the tests prove
+
+**Files:**
+- Modify: `README.md`
+- Modify: `SUBMISSION.md`
+- Modify: `docs/gates/submission-draft.md`
+- Modify: `docs/superpowers/specs/2026-11-18-anyorder-core-design.md`
+- Modify: `docs/superpowers/specs/2026-11-18-anyorder-docs-stretch-design.md`
+
+**Depends on:** Task 3
+**Effort:** low
+**Provides:** nothing other tasks name
+**Requires:** nothing from other tasks
+
+- [ ] **Step 1: Context**
+The old one-sentence pitch says more than the tests prove: no test shows that a sandwich has nothing at all to exploit. The tests prove the fills do not depend on transaction order. The old sentence:
+```text
+A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so sandwich attacks have nothing to exploit.
+```
+The new sentence, exactly, everywhere the old one stood:
+```text
+A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit.
+```
+Where the old sentence stands (checked 2026-11-19 with `git grep`): `README.md` line 4; the `**Pitch:**` line of `SUBMISSION.md`; `docs/gates/submission-draft.md` under "The short pitch (one sentence)" (wrapped over two lines); the `**Project:**` line of core spec §1 (wrapped, inside a longer sentence). The docs/stretch spec names the brief as the pitch's source, so that line changes too. **Not changed:** the brief `docs/idea-forge/2026-11-17-anyorder-brief.md` (a history document), and the plans under `docs/superpowers/plans/`, which are the architect's (they quote both sentences as instructions; the architect already put the new one into docs Task 1's body).
+**No UI copy repeats it.** `web/index.html`, `web/app/index.html` and `web/src` say it in their own words ("transaction order cannot change your fill"), so there is no UI task and no UI gate here; the gate's `git grep` covers `web/` too.
+**Not a file, not this task:** the GitHub repository's description still carries the old sentence. Changing it is an account setting, done at the Step-3 closing pass with the user's go (tollgate Notes).
+
+- [ ] **Step 2: Run the gate to confirm it fails on today's text (Git Bash)**
+Run: `p='A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit.'; ok=1; left=$(git grep -l -i -e 'nothing to explo[i]t' -- . ':!docs/idea-forge/' ':!docs/superpowers/plans/'); [ -z "$left" ] || { echo "OLD PITCH IN: $left"; ok=0; }; for f in README.md SUBMISSION.md docs/gates/submission-draft.md docs/superpowers/specs/2026-11-18-anyorder-core-design.md; do grep -qF "$p" "$f" || { echo "NEW PITCH MISSING: $f"; ok=0; }; done; [ "$(sed -n 4p README.md)" = "$p" ] || { echo 'README line 4 is not the pitch'; ok=0; }; grep -qxF "**Pitch:** $p" SUBMISSION.md || { echo 'SUBMISSION Pitch line differs'; ok=0; }; if [ "$ok" = 1 ]; then echo 'PITCH: OK'; else echo 'PITCH: FAIL'; false; fi`
+Expected: FAIL: `OLD PITCH IN:` listing `README.md`, `SUBMISSION.md`, `docs/gates/submission-draft.md` and the core spec; four `NEW PITCH MISSING:` lines; `README line 4 is not the pitch`; `SUBMISSION Pitch line differs`; last `PITCH: FAIL`.
+
+- [ ] **Step 3: README.md and SUBMISSION.md**
+Replace line 4 of `README.md` (the old sentence, alone on its line) with the new sentence, alone on its line. In `SUBMISSION.md` replace the line `**Pitch:** ` + old sentence with `**Pitch:** ` + new sentence.
+
+- [ ] **Step 4: The submission draft**
+In `docs/gates/submission-draft.md`, under `## The short pitch (one sentence)`, replace the two lines
+```markdown
+A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so
+sandwich attacks have nothing to exploit.
+```
+with the new sentence on one line.
+
+- [ ] **Step 5: The specs**
+In `docs/superpowers/specs/2026-11-18-anyorder-core-design.md` §1, replace the three lines
+```markdown
+- **Project:** "AnyOrder — a uniform-price batch-auction exchange in Fe whose fills are independent of
+  transaction order, so sandwich attacks have nothing to exploit, shipped as a full dApp (landing page
+  at /, app at /app) over a local Anvil chain."
+```
+with exactly
+```markdown
+- **Project:** AnyOrder: "A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit." Shipped as a full dApp (landing page at /, app at /app) over a local Anvil chain.
+  (Pitch wording revised 2026-11-19 by plan task docs:4 to match what the tests prove; the kickoff's
+  original wording is kept in the brief, `docs/idea-forge/2026-11-17-anyorder-brief.md`.)
+```
+In `docs/superpowers/specs/2026-11-18-anyorder-docs-stretch-design.md`, replace
+```markdown
+Content sources: the one-sentence pitch is the brief's solution line;
+```
+with
+```markdown
+Content sources: the one-sentence pitch is the sentence in core spec §1 (plan task docs:4 revised the
+brief's solution line to match what the tests prove);
+```
+(the rest of that line, from ` the numbers are the core spec`, stays).
+
+- [ ] **Step 6: Gate: the old sentence is gone from every non-history file, the new one is in each place (Git Bash)**
+Run: `p='A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit.'; ok=1; left=$(git grep -l -i -e 'nothing to explo[i]t' -- . ':!docs/idea-forge/' ':!docs/superpowers/plans/'); [ -z "$left" ] || { echo "OLD PITCH IN: $left"; ok=0; }; for f in README.md SUBMISSION.md docs/gates/submission-draft.md docs/superpowers/specs/2026-11-18-anyorder-core-design.md; do grep -qF "$p" "$f" || { echo "NEW PITCH MISSING: $f"; ok=0; }; done; [ "$(sed -n 4p README.md)" = "$p" ] || { echo 'README line 4 is not the pitch'; ok=0; }; grep -qxF "**Pitch:** $p" SUBMISSION.md || { echo 'SUBMISSION Pitch line differs'; ok=0; }; if [ "$ok" = 1 ]; then echo 'PITCH: OK'; else echo 'PITCH: FAIL'; false; fi`
+Expected: PASS — `PITCH: OK`
+
+- [ ] **Step 7: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `docs: pitch wording that matches what the tests prove`

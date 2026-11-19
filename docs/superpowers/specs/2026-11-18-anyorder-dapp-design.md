@@ -81,17 +81,21 @@ commands and what each proves), close-word, footer. Numbers are injected **at bu
 
 `public/deployment.json` (written by the deploy script; validated by `parseDeployment`) → viem public
 client (HTTP, JSON-RPC batching) polled every 2 s → islands. Hooks in `src/app/live.ts`:
-`useDeployment`, `useClients`, `useChain` (classify + staleness), `useBlockRead` (re-read on each new
+`useDeployment`, `useClients`, `useChain` (each poll folded by `nextChainState`, plus staleness), `useBlockRead` (re-read on each new
 block; `data` undefined until the first success), `readBatch` (info + every order + `preview`).
 
 | State | Trigger | What the island shows |
 |---|---|---|
 | loading | first read in flight | "Reading the chain…" |
-| unavailable | RPC unreachable or chain id ≠ 31337 | the reason and "Start the local chain: pnpm -C web local" + Reconnect |
+| unavailable | RPC unreachable (a failed poll with nothing live on screen, or failed polls once the live data would be stale) or chain id ≠ 31337 | the reason and "Start the local chain: pnpm -C web local" + Reconnect |
 | not-deployed | no code at `addresses.anyOrder` | "Deploy the contracts: pnpm -C web deploy:local" |
-| stale | no new block for 3 polls | the age, values dimmed |
+| stale | no answered poll for 3 polls (the RPC hangs); an idle chain that answers with the same block stays live, because Anvil mines only on transactions | the age, values dimmed |
 | empty | open batch, 0 orders | "No orders in batch N yet" (no curve) |
 | batch-open / batch-closed / cleared | `batchInfo.status` and count | countdown + preview / Clear button / the contract's result |
+
+Staleness is measured from the last poll the RPC answered, never from the last new block (amended
+2026-11-19, plan task dapp:11: the stale row first said "no new block for 3 polls", and that put a
+false "the chain stopped answering" notice on an idle chain).
 
 Transactions: idle, pending, confirmed, reverted with the decoded error name.
 
