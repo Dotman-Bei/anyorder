@@ -20,6 +20,8 @@ export async function rpcReady(rpcUrl: string): Promise<boolean> {
 export interface Anvil {
   rpcUrl: string
   stop(): Promise<void>
+  /** Ends Anvil at once, synchronously: for a process 'exit' handler, where nothing can be awaited. */
+  kill(): void
 }
 
 export async function startAnvil(port: number): Promise<Anvil> {
@@ -27,7 +29,7 @@ export async function startAnvil(port: number): Promise<Anvil> {
   if (await rpcReady(rpcUrl)) throw new Error(`port ${port} already serves a chain; stop it first`)
   const anvil: Running = start('anvil', [...ANVIL_ARGS, '--port', String(port)])
   for (let i = 0; i < 100; i++) {
-    if (await rpcReady(rpcUrl)) return { rpcUrl, stop: anvil.stop }
+    if (await rpcReady(rpcUrl)) return { rpcUrl, stop: anvil.stop, kill: () => void anvil.child.kill() }
     await new Promise((r) => setTimeout(r, 150))
   }
   await anvil.stop()
