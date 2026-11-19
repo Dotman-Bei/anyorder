@@ -96,6 +96,9 @@
 /* #trade: the island is a form on the system's recipe (labels above, 44px controls, one button pair) in the dark UI panel;
    the panel carries the page's dark tokens, so .field, .btn and the notice read on it */
 #trade .frame { --ratio: 0px; padding: var(--s-4); }
+/* the built-in traders' panel and the optional wallet panel below it stack in one frame */
+.trade-stack { display: grid; gap: var(--s-4); width: 100%; max-width: 580px; }
+.trade-stack > .ui-panel { max-width: none; }
 #trade .ui-panel { width: 100%; max-width: 580px; container-type: inline-size; color-scheme: dark;
   --bg: var(--p-surface); --surface: var(--p-bg); --ink: var(--p-ink); --muted: var(--p-muted);
   --line: color-mix(in oklab, var(--p-ink) 12%, transparent); --line-strong: color-mix(in oklab, var(--p-ink) 30%, transparent);
@@ -114,7 +117,10 @@
 .balances > div { display: grid; gap: var(--s-1); min-width: 0; }
 .balances dt { color: var(--u-muted); }
 .balances dd { margin: 0; font: 500 16px/24px var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.ticket__fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); align-items: end; }
+.ticket__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); align-items: end; }
+.ticket__fields > .btn { min-width: 0; padding-inline: var(--s-2); }
+.wallet .ticket__fields > .btn { grid-column: 1 / -1; }
+.wallet:is(:has(.ticket), :has(.wallet__status:not(:empty))) .wallet__intro { display: none; }
 .trade .field { color: var(--p-ink); min-width: 0; }
 .trade .field :is(input, select) { background: var(--p-bg); }
 .field-note { margin: 0; color: var(--u-ink); font: 400 14px/20px var(--font-text); }
@@ -125,9 +131,14 @@
 .tx-status { margin: 0; font: 400 14px/20px var(--font-text); overflow-wrap: anywhere; }
 .tx-status[data-state="failed"] { color: var(--error); }
 .tx-status[data-state="idle"] { color: var(--u-muted); }
+/* the wallet panel: its ticket has two fields and a button, its status line sits flush under them */
+.wallet__status { padding: 0 var(--s-4) var(--s-3); color: var(--u-ink); }
+.wallet__status:empty { display: none; }
 @container (min-width: 480px) {
   .ticket__fields { grid-template-columns: minmax(108px, .8fr) minmax(0, 1.2fr) minmax(0, 1fr) auto; }
   .funds { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .wallet .ticket__fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .wallet .ticket__fields > .btn { grid-column: auto; }
   .funds .field, .funds__all { grid-column: auto; }
 }
 @media (min-width: 1024px) and (max-width: 1279px) { #trade { --h: 2; } }
@@ -332,6 +343,7 @@
         <p>Each trader starts with 1,000 TKN and 100 ETH, half of each deposited. Anvil dev accounts. Test funds, no real value.</p>
       </div>
       <div class="frame frame--lit span-6 start-7">
+        <div class="trade-stack">
         <div class="ui ui-panel" data-island="trade">
           <div class="ui-head"><span class="ui-title">Traders</span><span class="ui-spacer"></span><span class="ui-meta">Anvil dev accounts 1 to 5</span></div>
           <ul class="ao-rows">
@@ -342,6 +354,12 @@
             <li><span>Attacker</span><span class="ao-v is-mark">account 5</span></li>
           </ul>
           <p class="ao-foot">Balances and the order ticket read the local chain once it runs.</p>
+        </div>
+        <div class="ui ui-panel trade wallet">
+          <div class="ui-head"><span class="ui-title">Your own wallet</span><span class="ui-spacer"></span><span class="ui-meta">optional</span></div>
+          <div class="trade__section wallet__intro"><p class="field-note">Optional: this works only with a browser wallet on the local Anvil chain (31337) that holds an account you imported yourself.</p></div>
+          <div data-island="wallet"></div>
+        </div>
         </div>
       </div>
     </div>

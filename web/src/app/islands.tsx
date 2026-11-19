@@ -6,10 +6,12 @@ import type { ReactNode } from 'react'
 import { BookTable, SettlePanel } from './BookAndSettle'
 import { SandwichRunner } from './SandwichRunner'
 import { TradePanel } from './TradePanel'
+import { WalletPanel } from './WalletPanel'
 
 export const islands: Record<string, () => ReactNode> = {
   trade: () => <TradePanel />,
   book: () => <BookTable />,
   settle: () => <SettlePanel />,
   sandwich: () => <SandwichRunner />,
+  wallet: () => <WalletPanel />,
 }
