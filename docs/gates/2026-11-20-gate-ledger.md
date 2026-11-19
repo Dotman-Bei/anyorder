@@ -38,7 +38,22 @@ The demo-video URL is already resolved in the README (line 63), SUBMISSION and d
 deploy, provider signup, API keys, OTP, extension install. The YouTube upload was demo-studio's (Step
 2.5) and is done.
 
-## Decision D1 (yours, needed before G5): where post-freeze evidence goes
+## User decisions, 2026-11-20
+
+- **Ledger approved.** G1 and G2 green-lit. G2 is held until G1's findings have been shown to the
+  user (the user's rule: findings first).
+- **HOLD G3 and everything after it.** Follow-up tasks are being planned and built first: dapp:14
+  (hosted mode), dapp:15 (absolute share URLs), docs:5 (the live page line and the "Built 2026-11-17
+  to 2026-11-24" wording fix). They change the commit to be judged. When the user reports them
+  committed: re-sync, re-scan only the new commits (G1 delta), then continue from G3.
+- **D1 decided:** the G5 commit is the freeze. After it, nothing is pushed to `main` until the deadline
+  has passed. G6–G8 evidence and the exact SHA stay in this file **locally, uncommitted**. There is
+  no `gates/ledger` branch. This file is committed to `main` only after the deadline.
+- **Live site added to G4 and the pre-submit checks:** https://anyorder.suitz.xyz/ (Vercel,
+  auto-redeploys from `main`). Expect 200 on `/` and `/app/`, `/share.jpg` served, and, once dapp:15
+  is in, `og:image` as an absolute URL on that domain.
+
+## Decision D1 (DECIDED above; original proposal kept for the record)
 
 Your rule is that the judged SHA must be the final commit on `main`. Two facts follow from it:
 
@@ -60,7 +75,7 @@ the deadline.
 
 | # | Gate | Tier | Pass | Tool plan (exact) | Human moment | Risk note | Status |
 |---|---|---|---|---|---|---|---|
-| G1 | **(a) Pre-flip privacy and secrets scan** of the working tree, all 60 commits on every ref, and commit metadata | A, read-only | closing | `Bash`: `git grep -nIE` over HEAD, then `git log --all -p` piped through `grep -nE`, for: email patterns (and the user's own address, matched in-process, never printed), `gho_`/`ghp_`/`github_pat_`, `sk-`/`AKIA`/`-----BEGIN`, 64-hex private-key shapes (Anvil dev keys are public and expected, so they are listed separately), 12/24-word mnemonics, the Google Forms prefill/`entry.` pattern, `C:\Users\<name>` and `/c/Users/<name>` paths, `AppData`, `.env` files; `git log --all --format='%an %ae %cn %ce'` for author emails; review of the tracked `.claude/agents/*.md` (5 files) and every file ever deleted (`git log --all --diff-filter=D --name-only`); `git check-ignore` for `.claude/settings.local.json`, `web/.taste-skill/` (a local Chrome profile, already ignored and untracked) | Decide on each finding. I report it with the least destructive fix (a forward commit that redacts the working tree; history rewrites are offered only as an option that needs your separate consent) | None: read-only. If a finding needs a product or doc fix, I stop and route it to the architect | pending |
+| G1 | **(a) Pre-flip privacy and secrets scan** of the working tree, all 60 commits on every ref, and commit metadata | A, read-only | closing | `Bash`: `git grep -nIE` over HEAD, then `git log --all -p` piped through `grep -nE`, for: email patterns (and the user's own address, matched in-process, never printed), `gho_`/`ghp_`/`github_pat_`, `sk-`/`AKIA`/`-----BEGIN`, 64-hex private-key shapes (Anvil dev keys are public and expected, so they are listed separately), 12/24-word mnemonics, the Google Forms prefill/`entry.` pattern, `C:\Users\<name>` and `/c/Users/<name>` paths, `AppData`, `.env` files; `git log --all --format='%an %ae %cn %ce'` for author emails; review of the tracked `.claude/agents/*.md` (5 files) and every file ever deleted (`git log --all --diff-filter=D --name-only`); `git check-ignore` for `.claude/settings.local.json`, `web/.taste-skill/` (a local Chrome profile, already ignored and untracked) | Decide on each finding. I report it with the least destructive fix (a forward commit that redacts the working tree; history rewrites are offered only as an option that needs your separate consent) | None: read-only. If a finding needs a product or doc fix, I stop and route it to the architect | **done 2026-11-20**: 3 findings (F1–F3), awaiting the user's decisions; see the evidence log. Delta re-scan due after dapp:14/15 and docs:5 |
 | G2 | **(b) Set the GitHub description** to the new pitch | A | closing | `Bash`: `gh repo edit Dotman-Bei/anyorder --description "A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit."`, verify with `gh repo view --json description` | none | Reversible metadata; no commit | pending |
 | G3 | **(c) Flip the repo public** | A, with your consent | closing | Preconditions re-checked right before the flip: G1 clean or resolved, `gh auth status` = `Dotman-Bei`, LICENSE root Apache-2.0 (`gh repo view --json licenseInfo`), CI green on HEAD (`gh run list`), README renders (`gh api -H "Accept: application/vnd.github.html" repos/Dotman-Bei/anyorder/readme`). Then `gh repo edit Dotman-Bei/anyorder --visibility public --accept-visibility-change-consequences`; verify anonymously (`curl -sI https://github.com/Dotman-Bei/anyorder` → 200 with no auth) and view the page in Chrome (`claude-in-chrome`, new tab) | Your consent is the moment | **Effectively irreversible.** Once public, forks, caches and indexers may keep copies even if the repo is made private again, so G1 must be clean first. Stars and watchers are lost if it is flipped back | pending |
 | G4 | **(d) Clean-room test** of the public repo, following only the README | A | closing | `Bash`: `git -c credential.helper= clone https://github.com/Dotman-Bei/anyorder` (no credentials, which proves the clone is anonymous) into scratchpad folder `cleanroom-nospace\` and then into `clean room\` (a path with a space); in each: `fe test`, `fe test --filter sandwich`, `pnpm -C web install`, `pnpm -C web local` (background), `curl` `/` and `/app/` expecting 200, then stop it and confirm no Anvil or Vite process is left. Every deviation from the README's words is recorded. The user's own servers on 8545/5173 are untouched (`local` moves ports when they are busy) | none | Local only. A defect means I stop and send you a fix hint (no product edits by me). Precondition: G3 (the repo must be public) | pending |
@@ -90,3 +105,39 @@ the deadline.
 ## Evidence log
 
 *(One entry per executed gate: date, command(s), observed result, commit.)*
+
+### G1: privacy and secrets scan, 2026-11-20 (scanned `main` at `b05cba4`, all refs: 1 branch, 0 tags, 61 commits, no stash)
+
+Commands: `git log --all --format='%an|%ae|%cn|%ce'`; `git log --all -p --full-history` (2.19 MB
+patch) and `git grep -nI` on HEAD, each run against the pattern sets in the G1 row; `git log --all
+--diff-filter=D --name-only`; `git check-ignore`; `strings` over every tracked image; a visual check
+of `docs/demo/storyboard/contact-sheet.png` (S1–S8) and `web/public/share.jpg`. Output was masked
+in-process, so neither personal address was printed in full.
+
+- **F1: personal email in commit metadata.** All 61 commits, author and committer (`Dotman-Bei
+  <b***@gmail.com>`, a personal Gmail address), including this ledger's own commit. This is git
+  metadata, not file content, so it's visible to anyone who clones the repo or opens a commit
+  `.patch` once it's public. Neither of the user's addresses appears in any file content, now or in
+  history.
+- **F2: Windows username in absolute paths**, 11 occurrences at HEAD in 3 tracked files:
+  `docs/guide/2026-11-17-fe-builders-challenge-runsheet.md` lines 3, 21, 69, 79 (×2);
+  `docs/tollgate/2026-11-17-tollgate.md` lines 39, 48, 74, 85 (×2); `demo/scripts/capture-terminal.ps1`
+  line 64 (the literal username in the "no username in the log" assertion). History has 2 more
+  lines, earlier versions of runsheet line 21 and tollgate line 74. No secret, an identifier only.
+  No binary contains it.
+- **F3: `.gitignore` doesn't cover `.env` / `web/.env`.** No env or secret file has ever been
+  tracked and the build uses no secrets. Hardening only.
+- **Clean:** no token shapes (`gh*_`, `github_pat_`, `sk-`, `AKIA`, `AIza`, `xox*-`, PEM private
+  keys); no 32-byte hex key anywhere (the only 64-hex value is fe's published SHA-256; Anvil
+  accounts are unlocked over JSON-RPC, so the code holds no keys); no mnemonic (12 "private key /
+  mnemonic" hits are all statements that none exist); no Google Forms prefill, `formResponse` or
+  `entry.` link (only the public base `viewform` URLs in `event.md` and the runsheet); no file was
+  ever deleted; no env, credential, key or keystore file was ever tracked; `.claude/settings.local.json`
+  and `web/.taste-skill/` (a local Chrome profile) are ignored and were never tracked; the 5
+  `.claude/agents/*.md` (13 lines each) carry no identifiers; the images show no personal data. The
+  only emails in content are `hello@fe-lang.org` (the organiser's, public) and the
+  `noreply@anthropic.com` co-author trailers.
+- **Limit:** the submission code and project ID can't be matched by value (the concierge never
+  holds them); only their link and prefill shapes were checked, and they were absent. The user can
+  confirm locally without sharing them: `git log --all -p -S"<value>" --oneline`, where empty
+  output means absent.
