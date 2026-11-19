@@ -1,6 +1,6 @@
 # AnyOrder
 
-**Pitch:** A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so sandwich attacks have nothing to exploit.
+**Pitch:** A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit.
 
 ## The problem
 

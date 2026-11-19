@@ -1,7 +1,7 @@
 <!-- readme-schema: R2-contract-protocol v1 + event-overlay -->
 # AnyOrder
 
-A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so sandwich attacks have nothing to exploit.
+A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit.
 
 Unaudited prototype for a local Anvil chain. Fe 26.6.0, EVM backend, EVM revision Osaka.
 

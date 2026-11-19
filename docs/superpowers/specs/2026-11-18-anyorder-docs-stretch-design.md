@@ -33,7 +33,8 @@ the architecture, and limitations. Start from `SUBMISSION.md`"). Resolved headin
 ## License
 ```
 
-Content sources: the one-sentence pitch is the brief's solution line; the numbers are the core spec
+Content sources: the one-sentence pitch is the sentence in core spec §1 (plan task docs:4 revised the
+brief's solution line to match what the tests prove); the numbers are the core spec
 §6 table (asserted by `fe test`); the Fe highlight is the `uses` table of core spec §7 with the
 `select_price` signature and the `place` signature as the code excerpt; Security notes and Limitations
 are core spec §11 verbatim in substance; Quickstart is `fe test --filter sandwich`,

@@ -10,9 +10,9 @@ Sister specs: `2026-11-18-anyorder-dapp-design.md` (sub-project B) and
 
 ## 1. Target, runtime, deadline (verbatim from the kickoff)
 
-- **Project:** "AnyOrder — a uniform-price batch-auction exchange in Fe whose fills are independent of
-  transaction order, so sandwich attacks have nothing to exploit, shipped as a full dApp (landing page
-  at /, app at /app) over a local Anvil chain."
+- **Project:** AnyOrder: "A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit." Shipped as a full dApp (landing page at /, app at /app) over a local Anvil chain.
+  (Pitch wording revised 2026-11-19 by plan task docs:4 to match what the tests prove; the kickoff's
+  original wording is kept in the brief, `docs/idea-forge/2026-11-17-anyorder-brief.md`.)
 - **Target:** "Fe 26.6.0 (contest allows >= 26.5.0), EVM backend, EVM revision Osaka, run with
   `fe test` / `fe build` on Windows 11 (Git Bash + PowerShell 5.1). The native backend is NOT
   available on Windows: any native build is a Linux-CI stretch only, never the core."

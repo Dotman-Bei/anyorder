@@ -21,8 +21,7 @@ repo.** The personal submission link prefills them; the user enters anything els
 
 ## The short pitch (one sentence)
 
-A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so
-sandwich attacks have nothing to exploit.
+A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit.
 
 ## Repository, commit, manifest, Fe version ("The full commit SHA, project manifest, and exact Fe version")
 
