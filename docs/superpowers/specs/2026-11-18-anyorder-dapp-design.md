@@ -104,8 +104,13 @@ Transactions: idle, pending, confirmed, reverted with the decoded error name.
 - `pnpm -C web local`: Anvil `--hardfork osaka --enable-tx-gas-limit --chain-id 31337` on 8545,
   `fe build`, deploy (account 0), fund traders (accounts 1-5: 1,000 TKN and 50 ETH each, 500 TKN and
   50 ETH deposited), seed (one cleared batch, then an open batch of `demoBatchSize` orders), write
-  `public/deployment.json`, start Vite. `pnpm -C web deploy:local` does the same against a running
-  chain. `pnpm -C web scenario` records `public/recorded/sandwich.json`.
+  `public/deployment.json`, start Vite's dev server in the same process (Vite's `createServer` API)
+  on 127.0.0.1:5173. Ctrl+C, or closing the command's input, stops Vite and Anvil; `--anvil-port N`
+  and `--port N` choose other ports, and `scripts/local-check.ts` proves the run serves `/`, `/app/`
+  and `deployment.json` and leaves nothing running when stopped (amended 2026-11-19, plan task
+  dapp:13: the run first launched Vite through `require.resolve('vite/bin/vite.js')`, a path Vite 7's
+  `exports` map does not expose, so it crashed after seeding). `pnpm -C web deploy:local` does the
+  same against a running chain. `pnpm -C web scenario` records `public/recorded/sandwich.json`.
 - `src/scenario/sandwich.ts` runs the four scenarios of the core spec §6 against the deployed
   contracts inside Anvil snapshots and rolls back, so the demo state survives; the same module runs in
   Node (recording) and in the browser (live run).

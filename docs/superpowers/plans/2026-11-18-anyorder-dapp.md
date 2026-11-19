@@ -3256,7 +3256,7 @@ Message: `feat(dapp): optional injected-wallet mode on the local chain`
 - Create: `web/scripts/lib/chrome.ts`
 - Create: `web/scripts/idle-check.ts`
 
-**Depends on:** Task 10
+**Depends on:** Task 10, Task 13
 **Effort:** medium
 **Model tier:** top
 **Provides:** `nextChainState(prev: ChainState, probe: Probe, now: number, pollMs?: number): ChainState (web/src/chain/state.ts)`, `findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)`, `pnpm -C web exec tsx scripts/idle-check.ts -> last line IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)`
@@ -3963,3 +3963,372 @@ Expected: PASS — `GATE: PASS`
 The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
 those paths with this message. The executor never runs git.
 Message: `feat(dapp): link-preview image captured from the real landing page`
+
+---
+
+### Task 13: The one-command local run really starts Vite, and stopping it stops Anvil and Vite
+
+**Files:**
+- Modify: `web/scripts/local.ts`
+- Modify: `web/scripts/lib/anvil.ts`
+- Create: `web/scripts/local-check.ts`
+
+**Depends on:** Task 10
+**Effort:** medium
+**Model tier:** top
+**Provides:** `pnpm -C web local [--anvil-port N] [--port N] (Vite in-process via createServer; Ctrl+C or closed input stops Vite and Anvil)`, `pnpm -C web exec tsx scripts/local-check.ts -> last line LOCAL: OK`
+**Requires:** `pnpm -C web local (Anvil 8545 + fe build + deploy + seed + Vite)`, `deployAll, fundTraders, seedDemo, demoOrder, advanceTo (web/scripts/lib/deploy.ts), startAnvil, rpcReady (web/scripts/lib/anvil.ts), deployLocal(rpcUrl?, outFile?, batchSeconds?) (web/scripts/deploy-local.ts)`
+
+- [ ] **Step 1: Context: the defect, the fix, and what was checked**
+This task runs **first** of the follow-up tasks (added 2026-11-19): Task 11 depends on it, because every later UI check and the demo recording use the one-command run.
+
+The defect, found by the guide on 2026-11-19: `web/scripts/local.ts` line 26 started Vite with `require.resolve('vite/bin/vite.js')`. Vite 7.3.8's `package.json` `exports` map does not expose `./bin/vite.js`, so the headline command crashed right after the deploy and seed step with `Package subpath './bin/vite.js' is not defined by "exports" in ...\web\node_modules\vite\package.json` (`ELIFECYCLE`, exit 1). The README Quickstart and the submission draft both tell judges to run `pnpm -C web local`. No test launched `local.ts`, which is why it passed until now. The architect reproduced it on 2026-11-19 in a clone at a path with a space.
+
+The fix: `local.ts` runs Vite's dev server **in its own process** through Vite's API (`createServer` from `vite`, the package's main export), so no path inside the vite package is needed and no extra process exists. Anvil is still a child process started with an argument array (`web/scripts/lib/anvil.ts`). Stopping:
+- Ctrl+C, SIGTERM, Ctrl+Break and a closed console window all run one `stop()`: close Vite, then stop Anvil, then exit 0. Closing the command's input does the same. `vite` itself stops on closed input outside CI; `local.ts` now does it everywhere, and it is how `scripts/local-check.ts` stops the run.
+- A process `'exit'` handler ends Anvil synchronously, whatever ends the process (an error, or Vite's own exit on SIGTERM). That needs `kill()` on the `Anvil` handle, added to `anvil.ts`. On Windows, Node already ends a child with its parent (libuv puts children in a job object), so this handler matters on Linux and macOS, where a child outlives its parent. The architect checked that a version without it still passes `local-check` on Windows, for that reason.
+
+New options for the check: `--anvil-port N` (default 8545) and `--port N` (default 5173). Without `--port`, the pages port moves up when 5173 is taken, as with `vite`. With `--port` it is exact. The plain command judges run is unchanged: Anvil on 8545, pages on `127.0.0.1:5173`.
+
+Verified by the architect in the spaced clone on 2026-11-19:
+- **The gate on today's code:** `local-check` FAILs.
+- **The gate on the fix:** `LOCAL: OK` on all four runs, 18-31 s each, with no Anvil or `local.ts` process left after.
+- **A real console Ctrl+C:** sent to a run with `GenerateConsoleCtrlEvent` from a separate console. Both processes stopped and both ports closed.
+- **Default port taken:** with 5173 in use, the pages moved to 5174 and the printed URL said so.
+- **Task 11's code on top of this task:** tsc passes, 28 tests pass, `IDLE: OK`.
+
+The same `require.resolve` pattern elsewhere (checked with `git grep` over `web/`, and in the planned scripts of Tasks 11 and 12):
+- `local.ts` is the only hit.
+- `ui-gate.ts`, and the planned `idle-check.ts` and `share-image.ts`, start `node_modules/vite/bin/vite.js` and `node_modules/typescript/bin/tsc` by **file path** (`join(WEB_DIR, 'node_modules', ...)`). Node applies `exports` only to package specifiers, never to file paths, so those work. All three were run by the architect. Leave them as they are.
+- `gas-table.ts` starts no package bin at all.
+
+Not in this task:
+- **CI:** CI's web job installs neither Foundry nor Fe, and this check needs both plus about 30 s of chain setup. The architect could not prove it stable on GitHub's runners, so it stays a local gate, like `ui-gate`.
+- **The README** needs no change: the command and its defaults are the same.
+
+Running the check needs `anvil` and `fe` on PATH. It uses free ports, so a local chain already on 8545 or a Vite already on 5173 does not disturb it. It overwrites `web/public/deployment.json` while it runs (a gitignored file) and puts it back as it was.
+
+- [ ] **Step 2: The check**
+Write `web/scripts/local-check.ts` with exactly this content:
+```ts
+/**
+ * dapp:13: the one-command local run really serves the app, and stopping it
+ * really stops Anvil and Vite. Starts `pnpm -C web local` on two free ports,
+ * waits until / and /app/ answer 200 with their own page (Vite would answer
+ * any path with the landing page, so each page's <title> is checked) and
+ * /deployment.json names the chosen RPC, finds the run's Anvil and local.ts
+ * processes, then closes the command's input (local.ts's stop path, the same
+ * one Ctrl+C takes) and proves the command exited, both ports refuse
+ * connections and none of those processes is left. web/public/deployment.json
+ * is put back as it was.
+ *
+ *   pnpm -C web exec tsx scripts/local-check.ts
+ *   last line: LOCAL: OK
+ */
+import { type ChildProcess, spawn } from 'node:child_process'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer, connect } from 'node:net'
+import { join } from 'node:path'
+import { run } from './lib/proc'
+import { REPO_ROOT, WEB_DIR } from './lib/repo'
+
+const READY_MS = 240_000
+const STOP_MS = 20_000
+const DEPLOYMENT = join(WEB_DIR, 'public', 'deployment.json')
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** A port nothing listens on right now: the OS picks it. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer()
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      server.close(() => (typeof address === 'object' && address !== null ? resolve(address.port) : reject(new Error('no port'))))
+    })
+  })
+}
+
+/** True when something accepts a TCP connection on 127.0.0.1:port. */
+function listening(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect(port, '127.0.0.1')
+    socket.setTimeout(1000)
+    socket.once('connect', () => (socket.destroy(), resolve(true)))
+    socket.once('error', () => resolve(false))
+    socket.once('timeout', () => (socket.destroy(), resolve(false)))
+  })
+}
+
+/** Every running process as "pid command line". */
+async function processList(): Promise<string[]> {
+  const result =
+    process.platform === 'win32'
+      ? await run('powershell.exe', ['-NoProfile', '-Command', "Get-CimInstance Win32_Process | ForEach-Object { [string]$_.ProcessId + ' ' + $_.CommandLine }"])
+      : await run('ps', ['-eo', 'pid=,args='])
+  return result.stdout.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '')
+}
+
+/** This run's Anvil and its local.ts processes, matched by the ports on their command lines. */
+async function leftovers(anvilPort: number): Promise<{ anvil: string[]; local: string[] }> {
+  const lines = await processList()
+  return {
+    anvil: lines.filter((l) => /anvil/i.test(l) && l.includes(`--port ${anvilPort}`) && !l.includes('--anvil-port')),
+    local: lines.filter((l) => l.includes('local.ts') && l.includes(`--anvil-port ${anvilPort}`)),
+  }
+}
+
+/** What a failed check must not leave behind: the command it started and the ports it chose. */
+const launched: { child?: ChildProcess; anvilPort?: number } = {}
+
+/** After a FAIL: ends the command's process tree and anything of this run still holding its ports. */
+async function cleanUp(): Promise<void> {
+  const { child, anvilPort } = launched
+  if (child?.pid !== undefined && child.exitCode === null) {
+    if (process.platform === 'win32') await run('taskkill', ['/pid', String(child.pid), '/t', '/f'])
+    else child.kill('SIGKILL')
+  }
+  if (anvilPort === undefined) return
+  const left = await leftovers(anvilPort)
+  for (const line of [...left.anvil, ...left.local]) {
+    try {
+      process.kill(Number(line.split(' ')[0]))
+    } catch {
+      // already gone
+    }
+  }
+}
+
+function title(file: string): string {
+  const match = /<title>([^<]+)<\/title>/.exec(readFileSync(join(WEB_DIR, file), 'utf8'))
+  if (!match?.[1]) throw new Error(`${file} has no <title>`)
+  return match[1]
+}
+
+async function page(url: string, want: string): Promise<string | null> {
+  try {
+    const response = await fetch(url)
+    const body = await response.text()
+    if (response.status !== 200) return `${url} answered ${response.status}`
+    return body.includes(`<title>${want}</title>`) ? null : `${url} is not the page titled "${want}"`
+  } catch {
+    return `${url} does not answer`
+  }
+}
+
+async function deploymentProblem(url: string, rpcUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch(url)
+    if (response.status !== 200) return `${url} answered ${response.status}`
+    const value = JSON.parse(await response.text()) as { rpcUrl?: unknown; chainId?: unknown; addresses?: { anyOrder?: unknown } }
+    if (value.rpcUrl !== rpcUrl) return `${url} names ${String(value.rpcUrl)}, not ${rpcUrl}`
+    if (value.chainId !== 31337) return `${url} has chainId ${String(value.chainId)}`
+    if (typeof value.addresses?.anyOrder !== 'string') return `${url} has no AnyOrder address`
+    return null
+  } catch (error) {
+    return `${url}: ${error instanceof Error ? error.message : String(error)}`
+  }
+}
+
+async function check(): Promise<string> {
+  const anvilPort = await freePort()
+  let webPort = await freePort()
+  while (webPort === anvilPort) webPort = await freePort()
+  const args = ['-C', 'web', 'local', '--anvil-port', String(anvilPort), '--port', String(webPort)]
+  console.log(`local-check: pnpm ${args.join(' ')}`)
+  // pnpm is a .cmd shim on Windows: start it through cmd.exe. Every argument is
+  // free of spaces; the spaced repository path is only the working directory.
+  const child =
+    process.platform === 'win32'
+      ? spawn(process.env.ComSpec ?? 'cmd.exe', ['/d', '/c', 'pnpm', ...args], { cwd: REPO_ROOT, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+      : spawn('pnpm', args, { cwd: REPO_ROOT, stdio: ['pipe', 'pipe', 'pipe'] })
+  launched.child = child
+  launched.anvilPort = anvilPort
+  let output = ''
+  child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()))
+  child.stderr.on('data', (chunk: Buffer) => (output += chunk.toString()))
+  let exitCode: number | null = null
+  const exited = new Promise<void>((resolve) => child.once('exit', (code) => ((exitCode = code ?? 1), resolve())))
+  const lastLines = () => output.trim().split(/\r?\n/).slice(-3).join(' | ')
+
+  const base = `http://127.0.0.1:${webPort}`
+  const rpcUrl = `http://127.0.0.1:${anvilPort}`
+  const landingTitle = title('index.html')
+  const appTitle = title(join('app', 'index.html'))
+  const started = Date.now()
+  let problem: string | null = 'not started'
+  while (Date.now() - started < READY_MS) {
+    if (exitCode !== null) throw new Error(`pnpm -C web local exited ${exitCode} before serving: ${lastLines()}`)
+    problem =
+      (await page(`${base}/`, landingTitle)) ??
+      (await page(`${base}/app/`, appTitle)) ??
+      (await deploymentProblem(`${base}/deployment.json`, rpcUrl))
+    if (problem === null) break
+    await sleep(1000)
+  }
+  if (problem !== null) {
+    child.stdin.end()
+    throw new Error(`not serving after ${READY_MS / 1000} s (${problem}): ${lastLines()}`)
+  }
+  const ready = Math.round((Date.now() - started) / 1000)
+  const before = await leftovers(anvilPort)
+  console.log(`local-check: serving after ${ready} s: / and /app/ 200, deployment.json names ${rpcUrl}`)
+  console.log(`local-check: running: ${before.anvil.length} Anvil, ${before.local.length} local.ts process(es)`)
+  if (before.anvil.length === 0 || before.local.length === 0) {
+    child.stdin.end()
+    throw new Error('could not find the run\'s Anvil and local.ts processes, so their exit cannot be proved')
+  }
+
+  child.stdin.end()
+  const stopStart = Date.now()
+  await Promise.race([exited, sleep(STOP_MS)])
+  if (exitCode === null) throw new Error(`pnpm -C web local still running ${STOP_MS / 1000} s after its input closed`)
+  await sleep(1000)
+  const after = await leftovers(anvilPort)
+  const gone: string[] = []
+  if (await listening(anvilPort)) gone.push(`Anvil port ${anvilPort} still accepts connections`)
+  if (await listening(webPort)) gone.push(`Vite port ${webPort} still accepts connections`)
+  for (const line of [...after.anvil, ...after.local]) gone.push(`left running: ${line}`)
+  if (gone.length > 0) throw new Error(gone.join('; '))
+  if (exitCode !== 0) throw new Error(`pnpm -C web local exited ${exitCode} on stop: ${lastLines()}`)
+  return `stopped in ${Math.round((Date.now() - stopStart) / 1000)} s with exit 0; Anvil and Vite gone`
+}
+
+async function main(): Promise<boolean> {
+  const saved = existsSync(DEPLOYMENT) ? readFileSync(DEPLOYMENT) : null
+  try {
+    const detail = await check()
+    console.log(`local-check: ${detail}`)
+    console.log('LOCAL: OK')
+    return true
+  } catch (error) {
+    await cleanUp()
+    console.log(`LOCAL: FAIL (${error instanceof Error ? error.message : String(error)})`)
+    return false
+  } finally {
+    if (saved !== null) writeFileSync(DEPLOYMENT, saved)
+    else rmSync(DEPLOYMENT, { force: true })
+  }
+}
+
+main().then((ok) => process.exit(ok ? 0 : 1))
+```
+
+- [ ] **Step 3: Run it to confirm it fails on today's code**
+Run: `pnpm -C web exec tsx scripts/local-check.ts`
+Expected: FAIL, exit code 1, and a last line that starts `LOCAL: FAIL (pnpm -C web local exited 1 before serving:`. When nothing serves on 8545, the line goes on with `... | Package subpath './bin/vite.js' is not defined by "exports" in ...\vite\package.json |  ELIFECYCLE  Command failed with exit code 1.)`. When a chain already serves on 8545 (today's code ignores the port options), it goes on with `port 8545 already serves a chain; stop it first`. Both were measured by the architect.
+
+- [ ] **Step 4: `kill()` on the Anvil handle**
+In `web/scripts/lib/anvil.ts`, replace
+```ts
+export interface Anvil {
+  rpcUrl: string
+  stop(): Promise<void>
+}
+```
+with exactly
+```ts
+export interface Anvil {
+  rpcUrl: string
+  stop(): Promise<void>
+  /** Ends Anvil at once, synchronously: for a process 'exit' handler, where nothing can be awaited. */
+  kill(): void
+}
+```
+and replace the line
+```ts
+    if (await rpcReady(rpcUrl)) return { rpcUrl, stop: anvil.stop }
+```
+with exactly
+```ts
+    if (await rpcReady(rpcUrl)) return { rpcUrl, stop: anvil.stop, kill: () => void anvil.child.kill() }
+```
+Nothing else in the file changes. Every other user of `startAnvil` (`ui-gate.ts`, `gas-table.ts`, the e2e tests, Task 11's `idle-check.ts`) only reads `rpcUrl` and calls `stop()`, so they are unaffected.
+
+- [ ] **Step 5: `local.ts` starts Vite through its API**
+Replace `web/scripts/local.ts` with exactly this content:
+```ts
+/**
+ * The one-command local run: starts Anvil (Osaka, per-transaction gas cap on)
+ * on 127.0.0.1:8545, builds and deploys the contracts, seeds the demo state and
+ * serves both pages with Vite's dev server on 127.0.0.1:5173. Vite runs in this
+ * process through its own API (`createServer`), never through a path inside the
+ * vite package, which its `exports` map does not expose.
+ * Ctrl+C stops Vite and Anvil together; so does closing this command's input,
+ * as it does for `vite` itself.
+ *
+ *   pnpm -C web local                                    Anvil on 8545, pages on 5173
+ *   pnpm -C web local --anvil-port 18545 --port 15173    other ports (scripts/local-check.ts)
+ */
+import { type ViteDevServer, createServer } from 'vite'
+import { startAnvil } from './lib/anvil'
+import { WEB_DIR } from './lib/repo'
+import { deployLocal } from './deploy-local'
+
+/** The port after `name` on the command line, or `fallback` when the option is absent. */
+function portOption(name: string, fallback: number): number {
+  const i = process.argv.indexOf(name)
+  if (i === -1) return fallback
+  const port = Number(process.argv[i + 1])
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`${name} needs a port number (1-65535)`)
+  return port
+}
+
+async function main(): Promise<void> {
+  const anvilPort = portOption('--anvil-port', 8545)
+  const webPort = portOption('--port', 5173)
+  const anvil = await startAnvil(anvilPort)
+  // However this process ends (Ctrl+C, closed input, an error, Vite's own exit), Anvil ends with it.
+  process.on('exit', () => anvil.kill())
+  let server: ViteDevServer | undefined
+  try {
+    const { deployment, seeded } = await deployLocal(anvil.rpcUrl)
+    console.log(`Anvil 31337 on ${anvil.rpcUrl}; AnyOrder ${deployment.addresses.anyOrder}; batch ${seeded.openBatch} open`)
+    console.log('Built-in traders are Anvil dev accounts. Test funds, no real value.')
+    // As with `vite`: the default port moves up when taken; a port asked for with --port is exact.
+    const strictPort = process.argv.includes('--port')
+    server = await createServer({ root: WEB_DIR, server: { host: '127.0.0.1', port: webPort, strictPort } })
+    await server.listen()
+  } catch (error) {
+    await server?.close()
+    await anvil.stop()
+    throw error
+  }
+  server.printUrls()
+  console.log('Ctrl+C stops Vite and Anvil.')
+  const running = server
+  let stopping = false
+  const stop = (): void => {
+    if (stopping) return
+    stopping = true
+    void running
+      .close()
+      .catch(() => undefined)
+      .then(() => anvil.stop())
+      .finally(() => process.exit(0))
+  }
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGBREAK', 'SIGHUP'] as const) process.on(signal, stop)
+  process.stdin.on('end', stop)
+  process.stdin.resume()
+}
+
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error)
+  process.exit(1)
+})
+```
+
+- [ ] **Step 6: Types and unit tests**
+Run: `pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test`
+Expected: no tsc output, then `Tests  23 passed (23)`
+
+- [ ] **Step 7: Gate: types, unit tests, then the one-command run serves and stops**
+Run: `pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test && pnpm -C web exec tsx scripts/local-check.ts`
+Expected: PASS — `LOCAL: OK`
+(Before it: `serving after N s: / and /app/ 200, deployment.json names http://127.0.0.1:<port>`, `running: 1 Anvil, 1 local.ts process(es)`, `stopped in N s with exit 0; Anvil and Vite gone`.)
+
+- [ ] **Step 8: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `fix(dapp): the one-command local run starts Vite through its API and stops cleanly`

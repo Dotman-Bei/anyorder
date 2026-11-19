@@ -1075,12 +1075,50 @@
       "status": "pending"
     },
     {
+      "id": "dapp:13",
+      "subsystem": "dapp",
+      "title": "The one-command local run really starts Vite, and stopping it stops Anvil and Vite",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:10"
+      ],
+      "effort": "medium",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "web/scripts/local-check.ts"
+        ],
+        "modify": [
+          "web/scripts/local.ts",
+          "web/scripts/lib/anvil.ts"
+        ],
+        "test": []
+      },
+      "provides": [
+        "pnpm -C web local [--anvil-port N] [--port N] (Vite in-process via createServer; Ctrl+C or closed input stops Vite and Anvil)",
+        "pnpm -C web exec tsx scripts/local-check.ts -> last line LOCAL: OK"
+      ],
+      "requires": [
+        "pnpm -C web local (Anvil 8545 + fe build + deploy + seed + Vite)",
+        "deployAll, fundTraders, seedDemo, demoOrder, advanceTo (web/scripts/lib/deploy.ts), startAnvil, rpcReady (web/scripts/lib/anvil.ts), deployLocal(rpcUrl?, outFile?, batchSeconds?) (web/scripts/deploy-local.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test && pnpm -C web exec tsx scripts/local-check.ts",
+        "expect": "LOCAL: OK"
+      },
+      "commit": "fix(dapp): the one-command local run starts Vite through its API and stops cleanly",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
       "id": "dapp:11",
       "subsystem": "dapp",
       "title": "Staleness means the RPC stopped answering, not that no block arrived",
       "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
       "depends_on": [
-        "dapp:10"
+        "dapp:10",
+        "dapp:13"
       ],
       "effort": "medium",
       "model_tier": "top",
