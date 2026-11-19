@@ -89,7 +89,8 @@ Notes for approval, kept inside this section because the schema allows no extra 
 - **Toolchain bootstrap downloads** (needed by the stack, none done yet; asking for a yes with this script): Playwright's Chromium into a cache (~170 MB), Remotion's Chrome Headless Shell into `demo/node_modules` (~100 MB), the Kokoro Python packages with PyTorch and the Kokoro model from Hugging Face (about 1 GB in total, into a Python 3.12 venv outside the repo). If `espeak-ng` is not bundled by the Kokoro dependencies, its Windows installer is a system install, which I will ask about separately.
 - **Honest wording rules the narration follows:** the terminal prints PASS lines, not the ETH figures, so S3 says "the test source asserts", and the figures come from a real `grep` of that source; the S2/S4 side-by-side is a recording and says so; the live run in S4 is a real transaction sequence inside rolled-back Anvil snapshots; the book is seeded and S8 says so; nothing says sandwiches are impossible or solved.
 - **Recording is real or it is a placeholder card:** a scene that will not pass its gate after its retakes becomes a labelled BLOCKED card and is reported, never staged.
-- **The pronunciation of "Fe"** is the one thing I cannot verify before TTS; I will listen to the first render of S1 and respell if needed.
+- **The pronunciation of "Fe"** is chosen by ear: listen to the first S1 render, pick the reading that sounds most natural, and use that one everywhere. No pronunciation is stated as correct anywhere in the video or the publish copy.
+- **Approval notes (user, 2026-11-19):** S3 may run past 32 s so the numbers can land (audio-first timing decides; a total up to about 2:45 is fine); S7 keeps "cannot read the clock, a caller or storage" exactly and never says clearing cannot know who the traders are; the closing card shows `github.com/Dotman-Bei/anyorder` as text, no QR; the toolchain downloads are approved; an `espeak-ng` system installer, if one is needed, is asked about separately before installing.
 
 ## 6 — QC record
 
@@ -122,3 +123,4 @@ Notes for approval, kept inside this section because the schema allows no extra 
 | date | event | by |
 |---|---|---|
 | 2026-11-19 | scripted | demo-studio |
+| 2026-11-19 | approved (c722532, with three notes in section 5) | user |

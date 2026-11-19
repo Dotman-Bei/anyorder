@@ -1,0 +1,24 @@
+{
+  "name": "anyorder-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Remotion project that assembles the AnyOrder demo video (code only; captures, audio and renders are git-ignored).",
+  "scripts": {
+    "scenes": "node scripts/gen-scenes.mjs",
+    "stills": "node scripts/render-stills.mjs"
+  },
+  "dependencies": {
+    "@remotion/captions": "4.0.487",
+    "@remotion/cli": "4.0.487",
+    "@remotion/media": "4.0.487",
+    "mediabunny": "1.66.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.487"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}

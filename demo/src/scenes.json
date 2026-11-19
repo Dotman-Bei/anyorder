@@ -1,0 +1,93 @@
+{
+  "source": "2026-11-19-demo-script.md",
+  "scenes": [
+    {
+      "id": "S1",
+      "seconds": 10,
+      "visual": "`/` landing hero, no clicks; the pitch sentence as an overlay card, the badge on",
+      "cue": "S1 \"This is AnyOrder…\"",
+      "driver": "screencast",
+      "gate": "`/` returned 200; hero heading visible; the page is not in the unavailable or error state",
+      "retakes": 3,
+      "take": "",
+      "narration": "This is AnyOrder. A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit."
+    },
+    {
+      "id": "S2",
+      "seconds": 12,
+      "visual": "`/` the sandwich-contrast section scrolled into view; the page's own \"Recorded on a local Anvil chain\" label stays in frame",
+      "cue": "S2 \"On a constant-product…\"",
+      "driver": "screencast",
+      "gate": "the recorded label and the recorded pool profit figure (as the page formats `web/public/recorded/sandwich.json`) are in the final frame",
+      "retakes": 3,
+      "take": "",
+      "narration": "On a constant-product pool, the order of transactions sets your price. A searcher buys just before your trade and sells just after it, and keeps what your trade moved."
+    },
+    {
+      "id": "S3",
+      "seconds": 32,
+      "visual": "terminal window, runner script: `fe test --filter sandwich`, `fe test --filter permutation`, then `grep -n 8_090_638_930_163_447 ingots/exchange/src/sandwich_tests.fe` — real output, nothing typed for show; idle compile waits may be time-ramped and labelled",
+      "cue": "S3 \"Here is the…\"",
+      "driver": "gfxcapture",
+      "gate": "the run's tee'd log contains `test result: ok. 6 passed; 0 failed`, `test result: ok. 3 passed; 0 failed` and the two grep hits (lines 36 and 117); every exit code 0; first frame shows no username",
+      "retakes": 3,
+      "take": "",
+      "narration": "Here is the evidence, on the real compiler. fe test, filter sandwich: six tests pass. The test source asserts that a pool sandwich nets the attacker 0.00809 ETH; the exact figure is on screen. The same orders in one batch clear at 0.011 either way. The victim's fifteen tokens cost exactly 0.165 ETH either way, and the attacker ends at minus one wei and zero tokens. Then the permutation filter: 256 shuffles of the pure rule and 256 shuffled interleavings at contract level. Same price, same fills, every time."
+    },
+    {
+      "id": "S4",
+      "seconds": 25,
+      "visual": "`/app` `#sandwich` scrolled through the three chapters, the recorded side-by-side, then click \"Run the sandwich on your local chain\"",
+      "cue": "S4 \"Now the same…\"",
+      "driver": "screencast",
+      "gate": "the live result's batch price is 0.011 alone and sandwiched, the victim's fill is unchanged, the attacker shows 0 tokens and −1 wei; the status line shows no error; `batchInfo` read back with `cast` is unchanged (snapshot rolled back)",
+      "retakes": 3,
+      "take": "",
+      "narration": "Now the same contrast in the app, against the real contracts on a local Anvil chain. The side-by-side is from a recorded run, labelled as such. This button repeats the scenario live, inside a snapshot that is rolled back. The pool victim gets fewer tokens. In the batch, the victim's fill and the price do not move, and the attacker nets zero tokens and loses one wei."
+    },
+    {
+      "id": "S5",
+      "seconds": 14,
+      "visual": "`/app` `#sandwich` \"Where the guarantee stops\" panel held in frame",
+      "cue": "S5 \"This panel is…\"",
+      "driver": "screencast",
+      "gate": "the panel's text includes \"Where the guarantee stops\" and \"condition C\" and the one-sided price 0.012, fully inside the viewport",
+      "retakes": 3,
+      "take": "",
+      "narration": "This panel is where the guarantee stops. It holds under condition C: equal legs, priced outside every other order. A one-sided buy still moves the price, from 0.011 to 0.012 ETH. That is market power, not ordering."
+    },
+    {
+      "id": "S6",
+      "seconds": 22,
+      "visual": "`/app` `#trade`: pick a built-in trader, place a buy into the open batch; `#settle`: click \"Advance time to close the batch (dev chain control)\", click \"Clear batch N\", click a trader's \"Claim\"",
+      "cue": "S6 \"Now the lifecycle…\"",
+      "driver": "screencast",
+      "gate": "each of the four transactions shows confirmed with no revert; the order appears in `#book`; the batch reads closed, then cleared at a price read from the contract; the claimed row reads Claimed; `cast call batchInfo` agrees",
+      "retakes": 3,
+      "take": "",
+      "narration": "Now the lifecycle. A built-in trader, an Anvil dev account, places an order into the open batch. The dev-chain control advances time to close the batch. Anyone can clear it, and the contract picks one price. Then the trader claims the fill. Placing and clearing declare no Call, so they cannot move funds."
+    },
+    {
+      "id": "S7",
+      "seconds": 24,
+      "visual": "`/` the Fe highlight section: the `select_price` signature and the `uses` table",
+      "cue": "S7 \"Fe makes that…\"",
+      "driver": "screencast",
+      "gate": "the section's text includes `select_price` and a `uses` row with `place` showing no `Call`; both fully in frame, legible at 1080p",
+      "retakes": 3,
+      "take": "",
+      "narration": "Fe makes that claim checkable from the signature. select_price, the clearing function, declares no effects at all: it cannot read the clock, a caller or storage, or move funds. The handlers that place orders and clear batches declare no Call, and the compiler enforces it. Only deposit token and withdraw hold Call."
+    },
+    {
+      "id": "S8",
+      "seconds": 11,
+      "visual": "`/app` close section and footer with the `fe test` commands, the disclosure overlay and the repo text",
+      "cue": "S8 \"Everything ran on…\"",
+      "driver": "screencast",
+      "gate": "footer text shows the two `fe test` commands; the badge and the closing disclosure are on",
+      "retakes": 3,
+      "take": "",
+      "narration": "Everything ran on a local Anvil chain: dev accounts, test funds, and a book seeded by the setup script. Not a live market. Code and tests are in the repo."
+    }
+  ]
+}

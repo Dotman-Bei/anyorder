@@ -1,0 +1,7 @@
+node_modules/
+# Binary and bulky outputs stay local: captures, TTS audio, renders, QC frames
+capture/
+audio/
+out/
+qc/
+.venv/
