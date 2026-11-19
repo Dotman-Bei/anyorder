@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { anyOrderAbi } from '../chain/abi'
 import { type Clients, clientsFor } from '../chain/client'
 import { type Deployment, loadDeployment } from '../chain/deployment'
-import { type ChainState, POLL_MS, classify, isStale } from '../chain/state'
+import { type ChainState, POLL_MS, type Probe, isStale, nextChainState } from '../chain/state'
 
 export function useDeployment(): { deployment?: Deployment; error?: string } {
   const [state, setState] = useState<{ deployment?: Deployment; error?: string }>({})
@@ -23,7 +23,12 @@ export function useClients(deployment: Deployment | undefined): Clients | undefi
   return useMemo(() => (deployment ? clientsFor(deployment.rpcUrl) : undefined), [deployment])
 }
 
-/** Polls the RPC; `stale` turns on after three missed polls. */
+/**
+ * Polls the RPC every POLL_MS. Every answered poll refreshes the data's age,
+ * even with no new block (an idle Anvil mines nothing). `stale` turns on after
+ * three polls without an answer: the clock ticks on every poll, so an RPC that
+ * hangs shows as stale before its request times out.
+ */
 export function useChain(deployment: Deployment | undefined, clients: Clients | undefined): { state: ChainState; stale: boolean } {
   const [state, setState] = useState<ChainState>({ kind: 'loading' })
   const [now, setNow] = useState(() => Date.now())
@@ -32,31 +37,28 @@ export function useChain(deployment: Deployment | undefined, clients: Clients | 
     if (!deployment || !clients) return
     let stopped = false
     const probe = async () => {
+      let result: Probe
       try {
         const [chainId, code, block] = await Promise.all([
           clients.public.getChainId(),
           clients.public.getCode({ address: deployment.addresses.anyOrder }),
           clients.public.getBlock({ blockTag: 'latest' }),
         ])
-        const next = classify(
-          { chainId, hasCode: code !== undefined && code !== '0x', address: deployment.addresses.anyOrder, block: block.number, blockTime: Number(block.timestamp) },
-          Date.now(),
-        )
-        const prev = last.current
-        // Keep the old seenAt while the block number has not moved, so staleness can show.
-        const kept = prev.kind === 'live' && next.kind === 'live' && prev.block === next.block ? prev : next
-        last.current = kept
-        if (!stopped) setState(kept)
+        result = { chainId, hasCode: code !== undefined && code !== '0x', address: deployment.addresses.anyOrder, block: block.number, blockTime: Number(block.timestamp) }
       } catch (e) {
-        if (stopped) return
-        const failed = classify({ error: e instanceof Error ? e.message : String(e) }, Date.now())
-        last.current = failed
-        setState(failed)
+        result = { error: e instanceof Error ? e.message : String(e) }
       }
-      if (!stopped) setNow(Date.now())
+      if (stopped) return
+      const at = Date.now()
+      last.current = nextChainState(last.current, result, at)
+      setState(last.current)
+      setNow(at)
     }
     void probe()
-    const timer = setInterval(() => void probe(), POLL_MS)
+    const timer = setInterval(() => {
+      setNow(Date.now())
+      void probe()
+    }, POLL_MS)
     return () => {
       stopped = true
       clearInterval(timer)

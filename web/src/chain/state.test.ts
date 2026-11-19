@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RECOVERY, batchPhase, classify, isStale, secondsLeft } from './state'
+import { type ChainState, RECOVERY, batchPhase, classify, isStale, nextChainState, secondsLeft } from './state'
 
 describe('classify', () => {
   it('reports an unreachable RPC with its recovery action', () => {
@@ -33,6 +33,45 @@ describe('isStale', () => {
     expect(isStale(live, 6000, 2000)).toBe(false)
     expect(isStale(live, 6001, 2000)).toBe(true)
     expect(isStale({ kind: 'loading' }, 1e9)).toBe(false)
+  })
+})
+
+describe('nextChainState', () => {
+  const answer = (block: bigint) => ({ chainId: 31337, hasCode: true, address: '0xabc', block, blockTime: 100 })
+  const down = { error: 'fetch failed' }
+
+  it('keeps an idle chain live: a poll that answers with the same block is fresh data', () => {
+    let s: ChainState = { kind: 'loading' }
+    for (let t = 0; t <= 30_000; t += 2000) {
+      s = nextChainState(s, answer(7n), t)
+      expect(isStale(s, t + 1999)).toBe(false)
+    }
+    expect(s).toEqual({ kind: 'live', block: 7n, blockTime: 100, seenAt: 30_000 })
+  })
+
+  it('takes a new block', () => {
+    const first = nextChainState({ kind: 'loading' }, answer(7n), 0)
+    expect(nextChainState(first, answer(8n), 2000)).toEqual({ kind: 'live', block: 8n, blockTime: 100, seenAt: 2000 })
+  })
+
+  it('measures staleness from the last answered poll, so an RPC that stops answering goes stale', () => {
+    const live = nextChainState({ kind: 'loading' }, answer(7n), 0)
+    expect(isStale(nextChainState(live, down, 4000), 6000)).toBe(false)
+    expect(isStale(nextChainState(live, down, 6000), 6001)).toBe(true)
+  })
+
+  it('rides out a dropped poll, then reports an unreachable RPC with its recovery action', () => {
+    const live = nextChainState({ kind: 'loading' }, answer(7n), 0)
+    expect(nextChainState(live, down, 2000)).toBe(live)
+    expect(nextChainState(live, down, 6000)).toBe(live)
+    expect(nextChainState(live, down, 8000)).toEqual({ kind: 'unavailable', reason: 'unreachable', detail: 'fetch failed' })
+  })
+
+  it('reports at once an RPC that never answered, a wrong chain and a missing contract', () => {
+    expect(nextChainState({ kind: 'loading' }, down, 0)).toEqual({ kind: 'unavailable', reason: 'unreachable', detail: 'fetch failed' })
+    const live = nextChainState({ kind: 'loading' }, answer(7n), 0)
+    expect(nextChainState(live, { chainId: 1 }, 2000)).toMatchObject({ kind: 'unavailable', reason: 'wrong-chain' })
+    expect(nextChainState(live, { chainId: 31337, hasCode: false, address: '0xabc' }, 2000)).toEqual({ kind: 'not-deployed', address: '0xabc' })
   })
 })
 

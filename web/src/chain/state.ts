@@ -39,9 +39,24 @@ export function classify(probe: Probe, now: number): ChainState {
   return { kind: 'live', block: probe.block, blockTime: probe.blockTime, seenAt: now }
 }
 
-/** Live data is stale after three missed polls. */
+/** Live data is stale after three polls without an answer: `seenAt` is the last poll the RPC answered. */
 export function isStale(state: ChainState, now: number, pollMs = POLL_MS): boolean {
   return state.kind === 'live' && now - state.seenAt > 3 * pollMs
+}
+
+/**
+ * The state after one poll. Staleness is measured from the last poll the RPC
+ * answered, never from the last new block: Anvil mines only on transactions,
+ * so an idle chain answers with the same block and is still live. A poll that
+ * fails while live data is on screen keeps that data until it would be stale
+ * (one dropped poll does not flash "unavailable"); after that, and whenever
+ * nothing live is on screen, the failure shows at once with its recovery action.
+ */
+export function nextChainState(prev: ChainState, probe: Probe, now: number, pollMs = POLL_MS): ChainState {
+  const next = classify(probe, now)
+  const unreachable = next.kind === 'unavailable' && next.reason === 'unreachable'
+  if (unreachable && prev.kind === 'live' && !isStale(prev, now, pollMs)) return prev
+  return next
 }
 
 export type BatchPhase = 'empty' | 'open' | 'closed' | 'cleared'
