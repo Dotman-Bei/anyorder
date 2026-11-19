@@ -91,7 +91,7 @@ through a test-clock twin while the deployed contract reads the block timestamp.
   per-transaction gas cap on; the landing page at `/`, the dApp at `/app` with built-in Anvil dev
   traders, no wallet extension needed).
 - **Video:** optional.
-  - TBD-post-build:demo-video-url (only if Step 2.5 records one)
+  - https://youtu.be/8QCVwiO_9c8 (unlisted; recorded and verified at Step 2.5)
 
 ## Declaration ("A declaration of pre-existing work, reused code, and AI assistance")
 

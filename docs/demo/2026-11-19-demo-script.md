@@ -110,13 +110,13 @@ Notes for approval, kept inside this section because the schema allows no extra 
 
 | field | value |
 |---|---|
-| Upload target + account | manual — uploaded by the user, in their own account |
+| Upload target + account | manual — uploaded by the user, in their own account (unlisted) |
 | Title | AnyOrder: a batch exchange in Fe where transaction order can't change your fill |
 | Description | A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit. This 2.5-minute demo shows `fe test --filter sandwich` and `fe test --filter permutation` on the real compiler, the same sandwich contrast on a real local chain in the app, the lifecycle (place, close, clear, claim), where the guarantee stops (a one-sided order still moves the price), and the Fe effects that make it checkable from signatures. Everything runs on a local Anvil chain (31337) with Anvil's public dev accounts and test funds; the batch book is seeded by the setup script, and the landing page's sandwich numbers are a recording of a real run. Not a live market, not deployed anywhere, unaudited prototype. Built for the Fe Builders Challenge 2026 with Fe 26.6.0. Repo: <add the public URL after the repo flip>. Music attribution: none (no music). |
 | Tags | Fe, Fe language, Ethereum, batch auction, sandwich attack, MEV, smart contracts, Anvil, Fe Builders Challenge |
 | Visibility | unlisted |
-| URL | TBD |
-| Verified logged-out | TBD |
+| URL | https://youtu.be/8QCVwiO_9c8 |
+| Verified logged-out | 2026-11-20: the guide and the studio each checked it; the oEmbed endpoint returned the exact title and the watch page answered HTTP 200 |
 | Resolves | submission-draft demo video URL |
 
 ## 8 — Status ledger
@@ -130,3 +130,5 @@ Notes for approval, kept inside this section because the schema allows no extra 
 | 2026-11-19 | recorded (8/8 scenes; S5 retaken once because the pointer covered a figure) | demo-studio |
 | 2026-11-19 | assembled | demo-studio |
 | 2026-11-19 | QC passed [residuals: the captions' wording follows Kokoro's reading of the numbers; S3 and S6 contain labelled speed-ups and held frames; the Fe pronunciation could not be auditioned by the studio and is consistent across scenes] | demo-studio |
+| 2026-11-20 | watched | user |
+| 2026-11-20 | uploaded (https://youtu.be/8QCVwiO_9c8) | user |

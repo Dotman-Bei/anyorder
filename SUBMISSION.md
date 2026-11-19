@@ -64,7 +64,7 @@ The reproducible CLI example runs the real compiler against the real contracts:
 fe test --filter sandwich           # test result: ok. 6 passed; 0 failed
 ```
 
-It asserts the numbers in the README's Demo table: in the pool the attacker profits; in the batch the victim's fill and the price are unchanged and the attacker nets 0 tokens and -1 wei. The demo video, the recorded run, the table of results and the one-command browser demo (`pnpm -C web local`) are in [README, Demo](README.md#demo).
+It asserts the numbers in the README's Demo table: in the pool the attacker profits; in the batch the victim's fill and the price are unchanged and the attacker nets 0 tokens and -1 wei. The demo video (https://youtu.be/8QCVwiO_9c8), the recorded run, the table of results and the one-command browser demo (`pnpm -C web local`) are in [README, Demo](README.md#demo).
 
 ## Limitations
 
