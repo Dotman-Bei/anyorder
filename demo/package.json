@@ -13,6 +13,7 @@
     "@remotion/cli": "4.0.487",
     "@remotion/media": "4.0.487",
     "mediabunny": "1.66.2",
+    "playwright": "1.61.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "remotion": "4.0.487"
