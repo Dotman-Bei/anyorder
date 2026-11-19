@@ -35,7 +35,7 @@ export const Storyboard: React.FC<{ id: string }> = ({ id }) => {
         <div style={{ background: c.bronze, color: '#101110', fontFamily: mono, fontWeight: 700, fontSize: 34, padding: '6px 18px' }}>{s.id}</div>
         <div style={{ fontFamily: mono, fontSize: 28, color: c.muted }}>{s.seconds} s planned · driver: {s.driver}</div>
       </div>
-      <div style={{ position: 'absolute', left: 64, right: 64, top: s.id === 'S1' || s.id === 'S8' ? 660 : 420, textAlign: 'center' }}>
+      <div style={{ position: 'absolute', left: 64, right: 64, top: s.id === 'S1' ? 660 : s.id === 'S8' ? 300 : 420, textAlign: 'center' }}>
         <div style={{ fontFamily: mono, fontSize: 24, color: c.bronze, letterSpacing: 3, marginBottom: 16 }}>FOOTAGE SLOT (STORYBOARD, NOT RECORDED)</div>
         <div style={{ fontSize: 34, lineHeight: 1.35, color: c.muted, maxWidth: 1500, margin: '0 auto' }}>{s.visual}</div>
       </div>

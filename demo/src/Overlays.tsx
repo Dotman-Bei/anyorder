@@ -43,22 +43,19 @@ export const PitchCard: React.FC = () => (
   </div>
 )
 
-// S8's tail: closing disclosure and repo text (no QR).
+// S8's tail: closing disclosure and repo text (no QR) as a lower strip, so the real /app footer
+// footage (with the two `fe test` commands) stays visible above it.
 export const OutroCard: React.FC = () => (
   <div
     style={{
-      position: 'absolute', left: 160, right: 160, top: 210, padding: '44px 56px', background: c.bar,
+      position: 'absolute', left: 160, right: 160, bottom: 250, padding: '18px 36px', background: c.bar,
       border: `1px solid ${c.bronze}`, fontFamily: sans, color: c.text,
     }}
   >
-    <div style={{ fontFamily: mono, fontSize: 26, color: c.bronze, letterSpacing: 2, marginBottom: 18 }}>ANYORDER</div>
-    <div style={{ fontSize: 44, lineHeight: 1.35, fontWeight: 600 }}>
+    <div style={{ fontSize: 32, lineHeight: 1.3, fontWeight: 600 }}>
       Ran on a local Anvil chain: dev accounts, test funds, a book seeded by the setup script. Not a live market.
       Unaudited prototype.
     </div>
-    <div style={{ fontFamily: mono, fontSize: 40, color: c.bronze, marginTop: 30 }}>{REPO}</div>
-    <div style={{ fontFamily: mono, fontSize: 28, color: c.muted, marginTop: 14 }}>
-      fe test --filter sandwich · fe test --filter permutation
-    </div>
+    <div style={{ fontFamily: mono, fontSize: 34, color: c.bronze, marginTop: 10 }}>{REPO}</div>
   </div>
 )
