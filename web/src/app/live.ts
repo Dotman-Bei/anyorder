@@ -9,13 +9,15 @@ import { type Clients, clientsFor } from '../chain/client'
 import { type Deployment, loadDeployment } from '../chain/deployment'
 import { type ChainState, POLL_MS, type Probe, isStale, nextChainState } from '../chain/state'
 
-export function useDeployment(): { deployment?: Deployment; error?: string } {
+/** Reads /deployment.json once; with `enabled` false (a hosted build) it reads nothing and stays empty. */
+export function useDeployment(enabled = true): { deployment?: Deployment; error?: string } {
   const [state, setState] = useState<{ deployment?: Deployment; error?: string }>({})
   useEffect(() => {
+    if (!enabled) return
     loadDeployment('/deployment.json')
       .then((deployment) => setState({ deployment }))
       .catch((e: unknown) => setState({ error: e instanceof Error ? e.message : String(e) }))
-  }, [])
+  }, [enabled])
   return state
 }
 

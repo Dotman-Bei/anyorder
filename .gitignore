@@ -4,6 +4,7 @@ spikes/gas/out/
 # Web
 web/node_modules/
 web/dist/
+web/dist-hosted/
 web/public/deployment.json
 # The design skill's finish-gate state: local only
 web/.taste-skill/

@@ -10,9 +10,10 @@ export interface RunResult {
   stderr: string
 }
 
-export function run(command: string, args: readonly string[], options: { cwd?: string } = {}): Promise<RunResult> {
+/** `env` replaces the child's environment (default: this process's own). */
+export function run(command: string, args: readonly string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, [...args], { cwd: options.cwd, shell: false, windowsHide: true })
+    const child = spawn(command, [...args], { cwd: options.cwd, env: options.env ?? process.env, shell: false, windowsHide: true })
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
@@ -23,7 +24,7 @@ export function run(command: string, args: readonly string[], options: { cwd?: s
 }
 
 /** Runs a command and throws with its output if it fails. */
-export async function runChecked(command: string, args: readonly string[], options: { cwd?: string } = {}): Promise<string> {
+export async function runChecked(command: string, args: readonly string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<string> {
   const result = await run(command, args, options)
   if (result.code !== 0) {
     throw new Error(`${command} ${args.join(' ')} exited ${result.code}\n${result.stdout}\n${result.stderr}`)

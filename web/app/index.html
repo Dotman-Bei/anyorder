@@ -80,6 +80,14 @@
 .batch-empty { color: var(--pc-muted); }
 .chain-notice { display: grid; gap: var(--s-3); color: var(--p-ink); font-size: max(13px, 2.1cqw); }
 .chain-notice code, .ui code, .closing__cta code { font-family: var(--font-mono); font-size: 0.92em; }
+.hosted-slot { padding: var(--s-4); border-top: 1px solid var(--u-line); }
+.chain-notice__links { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); }
+.chain-notice__links a { color: var(--p-ink); text-decoration: underline; text-underline-offset: 0.2em; }
+.chain-notice[data-state="hosted"] code { white-space: nowrap; }
+/* at 390 #sandwich is two screens with 151px to spare: its notice is the compact one */
+#sandwich .hosted-slot { padding: var(--s-2) var(--s-4) var(--s-3); }
+#sandwich .hosted-slot .chain-notice { gap: var(--s-2); }
+#sandwich .chain-notice__links { gap: var(--s-1) var(--s-4); }
 /* the app's own UI panels: dark UI in the page's colours on the lit (sage) ground */
 .ui { --fx-bg: var(--p-surface); --fx-surface: var(--p-bg); --fx-ink: var(--p-ink); --fx-muted: var(--p-muted);
       --fx-accent: var(--p-accent); --fx-accent-ink: var(--p-accent-ink); --ui-font: var(--font-text); --ui-mono: var(--font-mono); --ui-radius: var(--r-md); }
@@ -143,6 +151,12 @@
 }
 @media (min-width: 1024px) and (max-width: 1279px) { #trade { --h: 2; } }
 @media (max-width: 639px) { #trade { --hm: 2; } }
+/* dapp:14: a hosted build (<html data-hosted>) holds static panels and the notice, not the live ticket
+   and tables: on a phone #trade, #book and #settle each take what their content fills, one screen at least */
+@media (max-width: 639px) {
+  :root[data-hosted] :is(#trade, #book, #settle) { --hm: 1; }
+  :root[data-hosted] :is(#book, #settle) .frame { min-height: 0; }
+}
 /* #book and #settle: the island is a table in the dark UI panel, in flow; the table scrolls inside its own frame, never a second screen */
 :is(#book, #settle) .frame { --ratio: 0px; padding: var(--s-5); align-items: flex-start; }
 #book .frame { min-height: 496px; }
