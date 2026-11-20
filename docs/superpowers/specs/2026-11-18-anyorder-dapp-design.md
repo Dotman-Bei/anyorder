@@ -89,6 +89,7 @@ block; `data` undefined until the first success), `readBatch` (info + every orde
 | loading | first read in flight | "Reading the chain…" |
 | unavailable | RPC unreachable (a failed poll with nothing live on screen, or failed polls once the live data would be stale) or chain id ≠ 31337 | the reason and "Start the local chain: pnpm -C web local" + Reconnect |
 | not-deployed | no code at `addresses.anyOrder` | "Deploy the contracts: pnpm -C web deploy:local" |
+| hosted | a build for a public host (`VERCEL=1` at build time; §9) | nothing is read; the static panel stays and one hosted notice closes it |
 | stale | no answered poll for 3 polls (the RPC hangs); an idle chain that answers with the same block stays live, because Anvil mines only on transactions | the age, values dimmed |
 | empty | open batch, 0 orders | "No orders in batch N yet" (no curve) |
 | batch-open / batch-closed / cleared | `batchInfo.status` and count | countdown + preview / Clear button / the contract's result |
@@ -130,6 +131,12 @@ Transactions: idle, pending, confirmed, reverted with the decoded error name.
    `--new` when another page's build is open;
 4. runs `gate.mjs`, prints it, stops Anvil. Accepted only on the last line `GATE: PASS`.
 
+A third run, `pnpm -C web ui-gate app --hosted` (added 2026-11-20, plan task dapp:14), builds `/app`
+as the public host does (`VERCEL=1`) into `dist-hosted/`, starts no chain, checks the built page in
+headless Chrome (`HOSTED: OK`, `scripts/lib/hosted-check.ts`) and then runs the skill's gate on
+`dist-hosted/app/index.html`. Its own folder makes it its own build for the gate: alternating a hosted
+and a local build of one page would spend a round on every run.
+
 UI tasks run as one chain (never in parallel) because the gate keeps one build per folder in
 `web/.taste-skill/` (git-ignored, created only by this wrapper): app shell + hero → trade → book +
 settle → sandwich → landing → wallet polish. Each app task re-gates the whole `/app` page. The
@@ -156,3 +163,27 @@ Only the runtime files the built pages load, copied unmodified from
 
 `.github/workflows/ci.yml` gains a `web` job: `pnpm install --frozen-lockfile`, `pnpm -C web test`,
 `pnpm -C web gen:abi --check`, `pnpm -C web build`. The taste gate is local only (it needs the skill).
+
+## 9. Hosting (added 2026-11-20, plan tasks dapp:14 and dapp:15)
+
+The site is deployed on Vercel (root directory `web`, Vite preset, redeployed from `main`) at
+https://anyorder.suitz.xyz/. `/` works there unchanged: the recorded run is baked in at build time.
+`/app/` has no chain to read there (`/deployment.json` is git-ignored and answers 404).
+
+- **Hosted mode (dapp:14).** `vite.config.ts` defines `__ANYORDER_HOSTED__` from
+  `isHostedBuild(process.env)`: true when `VERCEL` is set (Vercel sets `VERCEL=1` in every build when
+  the project exposes its system environment variables, the default), false otherwise. Nothing is set
+  in the Vercel dashboard. In a hosted build `useLive` reads nothing, and `islandMode()` keeps #trade,
+  #book, #settle and #sandwich's static panels (the traders, how clearing reads the book, the
+  recorded cleared batch, the recorded sandwich table) and closes each with one hosted notice: "This app needs a local
+  Anvil chain (chain id 31337, Anvil dev accounts, test funds): `pnpm -C web install`, then
+  `pnpm -C web local`.", with links to the demo video (https://youtu.be/8QCVwiO_9c8) and the repo
+  (https://github.com/Dotman-Bei/anyorder). The hero card keeps its recorded figure and the wallet
+  panel stays static. `<html data-hosted>` lets the page's CSS give #trade, #book and #settle one
+  phone screen; #sandwich keeps two, and its notice fits in the 151 px its static panel leaves at 390.
+- **Local builds are unchanged.** `pnpm -C web local`, `ui-gate app`, `idle-check` and
+  `pnpm -C web build` without `VERCEL` render exactly what they rendered before (unit tests pin every
+  notice state's markup; `ui-gate` removes `VERCEL` from its local build's environment).
+- **Share URLs (dapp:15).** Both pages carry absolute `og:image` and `twitter:image`
+  (https://anyorder.suitz.xyz/share.jpg), `og:url` and a canonical link to their own URL (`/` and
+  `/app/`); `share-image.ts --check` verifies both pages.

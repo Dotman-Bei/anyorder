@@ -4,12 +4,12 @@
 **Architecture:** README.md follows the kit's R2-contract-protocol v1 schema with the event overlay
 (the starter's SUBMISSION.md headings R2 lacks); SUBMISSION.md keeps the starter's exact structure.
 Every number is one the tests assert or the recording shows.
-**Tech Stack:** Markdown; PowerShell 5.1 for the conformance gates of Tasks 1-2; Git Bash (bash 5, GNU awk,
+**Tech Stack:** Markdown; PowerShell 5.1 for the conformance gates of Tasks 1-2 and 5; Git Bash (bash 5, GNU awk,
 git grep) for the gates of Tasks 3-4; fe 26.6.0 for the version line.
 **Source spec:** docs/superpowers/specs/2026-11-18-anyorder-docs-stretch-design.md
 
-Conventions: the gates of Tasks 1 and 2 are PowerShell 5.1 one-liners, and the gates of Tasks 3 and 4
-are Git Bash (added 2026-11-19 as follow-up tasks; each gate step says which shell). Run PowerShell gates from the
+Conventions: the gates of Tasks 1, 2 and 5 are PowerShell 5.1 one-liners, and the gates of Tasks 3 and 4
+are Git Bash (Tasks 3 and 4 added 2026-11-19, Task 5 on 2026-11-20, as follow-up tasks; each gate step says which shell). Run PowerShell gates from the
 repository root, not Git Bash. Other `Run:` lines are Git Bash. Cross-plan dependencies are written
 `Task <subsystem>:<N>`. Never write the private submission code anywhere.
 
@@ -361,3 +361,45 @@ Expected: PASS — `PITCH: OK`
 The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
 those paths with this message. The executor never runs git.
 Message: `docs: pitch wording that matches what the tests prove`
+
+---
+
+### Task 5: Live landing page in the README and the submission draft
+
+**Files:**
+- Modify: `README.md`
+- Modify: `SUBMISSION.md`
+- Modify: `docs/gates/submission-draft.md`
+
+**Depends on:** Task dapp:15
+**Effort:** low
+**Provides:** nothing other tasks name
+**Requires:** nothing from other tasks
+
+- [ ] **Step 1: Context, and what may be claimed**
+Added 2026-11-20. The site is deployed on Vercel at https://anyorder.suitz.xyz/. What is true there, and all that the docs may say about it: `/` is a static landing page that shows the recorded run (baked in at build time, labelled "Recorded on a local Anvil chain, 2026-11-18, commit 48c0246"); `/app/` loads, and after Task dapp:14 its live sections say that the app needs a local Anvil chain and how to start it. **Nothing trades there:** no chain, no contracts, no live market, and the app does not run on the hosted site. This task depends on dapp:15 (and through it on dapp:14) so the line goes in only after both are green.
+
+The line, exactly, the same in all three files:
+```text
+Live page: https://anyorder.suitz.xyz/ (the landing page; the app needs a local chain, see Quickstart)
+```
+"Quickstart" is the README's `## Quickstart` section (`pnpm -C web install`, `pnpm -C web local`); SUBMISSION.md links the README's Demo section on the line above it. Do not add the domain anywhere else in these files, and add no other sentence about the hosted site. The gate counts every mention of `anyorder.suitz.xyz` in each file: exactly one, the line itself.
+
+- [ ] **Step 2: Run the gate to confirm it fails on today's docs (PowerShell 5.1, from the repository root)**
+Run the PowerShell line of Step 4.
+Expected: FAIL: `LIVE PAGE LINE: FAIL in README.md (line hits 0, domain mentions 0)`, the same for `SUBMISSION.md` and `docs/gates/submission-draft.md`, no `SCHEMA: FAIL` line (the docs:1 and docs:2 structure checks pass on today's text), last line `LIVE PAGE: FAIL`. Measured by the architect.
+
+- [ ] **Step 3: The three edits**
+- `README.md`, in `## Demo`: directly after the line `Demo video: https://youtu.be/8QCVwiO_9c8`, insert an empty line, then the line. (The empty line before `## What it does` stays.)
+- `SUBMISSION.md`, in `## Demo`: directly after the paragraph line that ends `are in [README, Demo](README.md#demo).`, insert an empty line, then the line. (The empty line before `## Limitations` stays.)
+- `docs/gates/submission-draft.md`, in `## Demo or reproducible example (...)`: directly after the line `  - https://youtu.be/8QCVwiO_9c8 (unlisted; recorded and verified at Step 2.5)`, insert the line as a list item: `- ` followed by the line.
+
+- [ ] **Step 4: Gate: the README and SUBMISSION structure gates still pass, and the line is in each file's Demo section, once, with no other mention of the domain (PowerShell 5.1)**
+The README and SUBMISSION checks are the gates of docs:1 and docs:2, unchanged. Measured by the architect with these exact edits: `LIVE PAGE: OK`.
+Run: `$line = 'Live page: https://anyorder.suitz.xyz/ (the landing page; the app needs a local chain, see Quickstart)'; $script:ok = $true; function Get-Heads($lines) { $inFence = $false; foreach ($l in $lines) { if ($l -match '^\x60{3}') { $inFence = -not $inFence } elseif (-not $inFence -and $l -cmatch '^#{1,2} ') { $l } } }; function Test-Live($name, $lines, $from, $to, $whole) { $a = [array]::IndexOf($lines, $from); $b = [array]::IndexOf($lines, $to); $hits = @(for ($i = 0; $i -lt $lines.Count; $i++) { if (($whole -and $lines[$i] -ceq $line) -or ((-not $whole) -and $lines[$i].Contains($line))) { $i } }); $urls = @($lines | Where-Object { $_.Contains('anyorder.suitz.xyz') }).Count; if ($a -lt 0 -or $b -lt 0 -or $hits.Count -ne 1 -or $hits[0] -le $a -or $hits[0] -ge $b -or $urls -ne 1) { "LIVE PAGE LINE: FAIL in $name (line hits $($hits.Count), domain mentions $urls)"; $script:ok = $false } }; $readme = @(Get-Content README.md -Encoding UTF8); $sub = @(Get-Content SUBMISSION.md -Encoding UTF8); $draft = @(Get-Content docs/gates/submission-draft.md -Encoding UTF8); $wantR = @('# AnyOrder','## Demo','## What it does','## Quickstart','## Built at Fe Builders Challenge 2026','## Contract addresses','## How it works','## Security notes','## Build & test','## Deploy','## The problem','## Approach','## Fe highlight','## Architecture','## Limitations','## Declaration','## Team','## Roadmap','## License'); $wantS = @('# AnyOrder','## The problem','## Approach','## Fe highlight','## Architecture','## Build and test','## Demo','## Limitations','## Declaration','## Team','## License'); if (((@(Get-Heads $readme)) -join '|') -cne ($wantR -join '|') -or $readme[0] -cne '<!-- readme-schema: R2-contract-protocol v1 + event-overlay -->') { 'README SCHEMA: FAIL'; $script:ok = $false }; if (((@(Get-Heads $sub)) -join '|') -cne ($wantS -join '|') -or @($sub -cmatch '^\*\*Pitch:\*\* ').Count -ne 1) { 'SUBMISSION SCHEMA: FAIL'; $script:ok = $false }; Test-Live 'README.md' $readme '## Demo' '## What it does' $true; Test-Live 'SUBMISSION.md' $sub '## Demo' '## Limitations' $true; Test-Live 'docs/gates/submission-draft.md' $draft '## Demo or reproducible example ("A short demo: a video, screenshots, or a reproducible CLI example")' '## Declaration ("A declaration of pre-existing work, reused code, and AI assistance")' $false; if ($script:ok) { 'LIVE PAGE: OK' } else { 'LIVE PAGE: FAIL' }`
+Expected: PASS — `LIVE PAGE: OK`
+
+- [ ] **Step 5: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `docs: live landing page in the README and the submission`

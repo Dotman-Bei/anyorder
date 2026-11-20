@@ -1258,6 +1258,120 @@
       "human_gate": false,
       "allow_empty": false,
       "status": "pending"
+    },
+    {
+      "id": "dapp:14",
+      "subsystem": "dapp",
+      "title": "Hosted mode: /app on a public host explains itself instead of looking broken",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:12"
+      ],
+      "effort": "high",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "web/src/lib/hosted.ts",
+          "web/scripts/lib/hosted-check.ts"
+        ],
+        "modify": [
+          "web/vite.config.ts",
+          "web/src/app/live.ts",
+          "web/src/app/shared.tsx",
+          "web/src/app/islands.tsx",
+          "web/src/app/main.tsx",
+          "web/app/index.html",
+          "web/scripts/lib/proc.ts",
+          "web/scripts/ui-gate.ts",
+          ".gitignore"
+        ],
+        "test": [
+          "web/src/app/hosted.test.tsx"
+        ]
+      },
+      "provides": [
+        "HOSTED, isHostedBuild(env), HOSTED_LINKS (web/src/lib/hosted.ts; vite.config.ts defines __ANYORDER_HOSTED__ from VERCEL at build time)",
+        "pnpm -C web ui-gate app --hosted (VERCEL=1 build into dist-hosted/, HOSTED: OK check in Chrome, then the skill's gate)",
+        "run(command, args, { cwd?, env? }), runChecked(command, args, { cwd?, env? }) (web/scripts/lib/proc.ts)"
+      ],
+      "requires": [
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)",
+        "findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)",
+        "pnpm -C web exec tsx scripts/idle-check.ts -> last line IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)",
+        "pnpm -C web exec tsx scripts/local-check.ts -> last line LOCAL: OK"
+      ],
+      "gate": {
+        "run": "pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test && pnpm -C web exec tsx scripts/idle-check.ts && pnpm -C web exec tsx scripts/local-check.ts && pnpm -C web ui-gate app && pnpm -C web ui-gate app --hosted",
+        "expect": "GATE: PASS"
+      },
+      "commit": "feat(dapp): hosted mode, /app on a public host says how to run it locally",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "dapp:15",
+      "subsystem": "dapp",
+      "title": "Absolute share URLs on the real domain",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "dapp:14"
+      ],
+      "effort": "low",
+      "model_tier": "top",
+      "files": {
+        "create": [],
+        "modify": [
+          "web/index.html",
+          "web/app/index.html",
+          "web/scripts/share-image.ts"
+        ],
+        "test": []
+      },
+      "provides": [
+        "share meta on https://anyorder.suitz.xyz/ and /app/ (absolute og:image and twitter:image, og:url, canonical) + pnpm -C web exec tsx scripts/share-image.ts --check -> last line SHARE: OK 1200x630 <bytes> bytes, meta on / and /app/"
+      ],
+      "requires": [
+        "web/public/share.jpg (1200x630 still of the built landing page) + pnpm -C web exec tsx scripts/share-image.ts [--check] -> last line SHARE: OK 1200x630 <bytes> bytes",
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)"
+      ],
+      "gate": {
+        "run": "pnpm -C web exec tsx scripts/share-image.ts --check && pnpm -C web ui-gate landing",
+        "expect": "GATE: PASS"
+      },
+      "commit": "feat(dapp): absolute share URLs and canonical links on anyorder.suitz.xyz",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
+    },
+    {
+      "id": "docs:5",
+      "subsystem": "docs",
+      "title": "Live landing page in the README and the submission draft",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-docs.md",
+      "depends_on": [
+        "dapp:15"
+      ],
+      "effort": "low",
+      "files": {
+        "create": [],
+        "modify": [
+          "README.md",
+          "SUBMISSION.md",
+          "docs/gates/submission-draft.md"
+        ],
+        "test": []
+      },
+      "provides": [],
+      "requires": [],
+      "gate": {
+        "run": "$line = 'Live page: https://anyorder.suitz.xyz/ (the landing page; the app needs a local chain, see Quickstart)'; $script:ok = $true; function Get-Heads($lines) { $inFence = $false; foreach ($l in $lines) { if ($l -match '^\\x60{3}') { $inFence = -not $inFence } elseif (-not $inFence -and $l -cmatch '^#{1,2} ') { $l } } }; function Test-Live($name, $lines, $from, $to, $whole) { $a = [array]::IndexOf($lines, $from); $b = [array]::IndexOf($lines, $to); $hits = @(for ($i = 0; $i -lt $lines.Count; $i++) { if (($whole -and $lines[$i] -ceq $line) -or ((-not $whole) -and $lines[$i].Contains($line))) { $i } }); $urls = @($lines | Where-Object { $_.Contains('anyorder.suitz.xyz') }).Count; if ($a -lt 0 -or $b -lt 0 -or $hits.Count -ne 1 -or $hits[0] -le $a -or $hits[0] -ge $b -or $urls -ne 1) { \"LIVE PAGE LINE: FAIL in $name (line hits $($hits.Count), domain mentions $urls)\"; $script:ok = $false } }; $readme = @(Get-Content README.md -Encoding UTF8); $sub = @(Get-Content SUBMISSION.md -Encoding UTF8); $draft = @(Get-Content docs/gates/submission-draft.md -Encoding UTF8); $wantR = @('# AnyOrder','## Demo','## What it does','## Quickstart','## Built at Fe Builders Challenge 2026','## Contract addresses','## How it works','## Security notes','## Build & test','## Deploy','## The problem','## Approach','## Fe highlight','## Architecture','## Limitations','## Declaration','## Team','## Roadmap','## License'); $wantS = @('# AnyOrder','## The problem','## Approach','## Fe highlight','## Architecture','## Build and test','## Demo','## Limitations','## Declaration','## Team','## License'); if (((@(Get-Heads $readme)) -join '|') -cne ($wantR -join '|') -or $readme[0] -cne '<!-- readme-schema: R2-contract-protocol v1 + event-overlay -->') { 'README SCHEMA: FAIL'; $script:ok = $false }; if (((@(Get-Heads $sub)) -join '|') -cne ($wantS -join '|') -or @($sub -cmatch '^\\*\\*Pitch:\\*\\* ').Count -ne 1) { 'SUBMISSION SCHEMA: FAIL'; $script:ok = $false }; Test-Live 'README.md' $readme '## Demo' '## What it does' $true; Test-Live 'SUBMISSION.md' $sub '## Demo' '## Limitations' $true; Test-Live 'docs/gates/submission-draft.md' $draft '## Demo or reproducible example (\"A short demo: a video, screenshots, or a reproducible CLI example\")' '## Declaration (\"A declaration of pre-existing work, reused code, and AI assistance\")' $false; if ($script:ok) { 'LIVE PAGE: OK' } else { 'LIVE PAGE: FAIL' }",
+        "expect": "LIVE PAGE: OK"
+      },
+      "commit": "docs: live landing page in the README and the submission",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
     }
   ]
 }

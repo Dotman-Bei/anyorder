@@ -22,7 +22,7 @@ Conventions for every task in this plan:
   unlocked dev accounts.
 - Paths contain spaces on this machine ("VIBE CODE"): child processes take argument arrays, never a
   shell string.
-- UI tasks (5-12): read `~/.claude/skills/design-taste-frontend/SKILL.md` in full first, then
+- UI tasks (5-12, 14, 15): read `~/.claude/skills/design-taste-frontend/SKILL.md` in full first, then
   `references/copy.md`, `copy-voice.md`, `system.md`, `layout-v4.md`, `sections.md`, `cards.md`,
   `motion.md`, `moments.md`, `effects-usage.md`, `gate.md`. Never invoke a Skill tool, never re-run a
   deal (the deal below is pinned), never edit a kit file, never add a waiver for `kit-edited`. You may
@@ -4332,3 +4332,1005 @@ Expected: PASS — `LOCAL: OK`
 The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
 those paths with this message. The executor never runs git.
 Message: `fix(dapp): the one-command local run starts Vite through its API and stops cleanly`
+
+---
+
+### Task 14: Hosted mode: /app on a public host explains itself instead of looking broken
+
+**Files:**
+- Create: `web/src/lib/hosted.ts`
+- Create: `web/scripts/lib/hosted-check.ts`
+- Modify: `web/vite.config.ts`
+- Modify: `web/src/app/live.ts`
+- Modify: `web/src/app/shared.tsx`
+- Modify: `web/src/app/islands.tsx`
+- Modify: `web/src/app/main.tsx`
+- Modify: `web/app/index.html`
+- Modify: `web/scripts/lib/proc.ts`
+- Modify: `web/scripts/ui-gate.ts`
+- Modify: `.gitignore`
+- Test: `web/src/app/hosted.test.tsx`
+
+**Depends on:** Task 12
+**Effort:** high
+**Model tier:** top
+**Provides:** `HOSTED, isHostedBuild(env), HOSTED_LINKS (web/src/lib/hosted.ts; vite.config.ts defines __ANYORDER_HOSTED__ from VERCEL at build time)`, `pnpm -C web ui-gate app --hosted (VERCEL=1 build into dist-hosted/, HOSTED: OK check in Chrome, then the skill's gate)`, `run(command, args, { cwd?, env? }), runChecked(command, args, { cwd?, env? }) (web/scripts/lib/proc.ts)`
+**Requires:** `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)`, `findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)`, `pnpm -C web exec tsx scripts/idle-check.ts -> last line IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)`, `pnpm -C web exec tsx scripts/local-check.ts -> last line LOCAL: OK`
+
+- [ ] **Step 1: Read the skill first, then the context**
+Read `~/.claude/skills/design-taste-frontend/SKILL.md` in full, then the references named in this plan's conventions (the copy layer: `references/copy.md`, `copy-voice.md`, `copy-tells.md`). Never invoke a Skill tool, never re-run a deal, never edit a kit file, never add a waiver for `kit-edited`. No other design skill or library default sets a visual decision. You may change the notice's markup and class names to fit the skill's recipes; never change the data logic (what is mounted, what is fetched, what each build renders). **Do not lengthen the notice:** at 390 px the hosted #sandwich has 151 px of room for it before the section passes two screens (see below); the planned notice leaves 18 px of that room unused.
+
+The problem (added 2026-11-20): the site is hosted on Vercel (root directory `web`, Vite preset, redeployed from `main`) at https://anyorder.suitz.xyz/. `/` works there, because the recorded run is baked in at build time. `/app/` loads, but `/deployment.json` answers 404 there (it is git-ignored, written only by a local deploy), so every live island shows "The local chain is unavailable (...)", "Start the local chain: pnpm -C web local" and a Reconnect button, which looks broken to a visitor. Measured by the architect on 2026-11-20: `/`, `/app/`, `/share.jpg` and `/recorded/sandwich.json` answer 200, `/deployment.json` answers 404.
+
+The mechanism (no setting in the Vercel dashboard): Vercel sets `VERCEL=1` in the environment of every build it runs (its "System Environment Variables" documentation lists `VERCEL` as available at build time, example `1`; it is exposed by the project setting "Automatically expose System Environment Variables", which is on by default). `vite.config.ts` calls `isHostedBuild(process.env)` once and defines the build-time constant `__ANYORDER_HOSTED__`; `src/lib/hosted.ts` reads it as `HOSTED`. Any other build (`pnpm -C web local`, `ui-gate app`, `idle-check`, `pnpm -C web build` without `VERCEL`) has `HOSTED` false and renders exactly what it rendered before; the unit tests pin today's markup of every notice state byte for byte, and `ui-gate` now deletes `VERCEL` from its local build's environment, so a local gate is local on any machine.
+
+What a hosted build shows on `/app` (one notice in each section that has a live part; decided and measured by the architect):
+- **#trade, #book, #settle, #sandwich:** their static panels stay as built (the five traders; how clearing reads the book; the recorded cleared batch; the recorded sandwich table and where the guarantee stops, each recorded panel labelled "Recorded on a local Anvil chain, <date>, commit <sha>"), and the hosted notice is added at the end of each panel, in a `.hosted-slot`, where the live ticket, order book, clearing and run would be. The islands themselves are not mounted, so nothing is fetched.
+- **The hero card (#batch):** left exactly as built, the recorded clearing price labelled "Recorded on a local Anvil chain, <date>, commit <sha>". No notice in the hero.
+- **The wallet panel:** its island is not mounted; #trade's notice speaks for the section.
+- **The hosted notice:** "This app needs a local Anvil chain (chain id 31337, Anvil dev accounts, test funds): `pnpm -C web install`, then `pnpm -C web local`." and the links "Watch the demo video" (https://youtu.be/8QCVwiO_9c8) and "Source on GitHub" (https://github.com/Dotman-Bei/anyorder). The repo link keeps the footer's own label, because the skill allows one label per target. Each command stays on one line. No claim beyond the recorded run.
+- **No request** for `/deployment.json` and no RPC: `useLive(hosted)` skips the deployment fetch, and no island polls.
+- **Phone layout:** the page's CSS sizes #trade, #book and #settle for their live forms and tables (two phone screens, tall frames). `main.tsx` marks a hosted build with `<html data-hosted="true">`, and one CSS block gives those three sections one phone screen at least, as tall as their content. #sandwich keeps its two phone screens (the page's own rule, so that its last screen shows no footer).
+
+How this layout was found (the skill's gate, run by the architect on each version):
+- **A notice in place of each panel**, as first asked: #trade, #book and #settle were left 53-70% empty (`empty-area`, `sparse`, `section-air`, `section-gaps`, `no-visual`: 9 FAILs). Keeping the static panels and adding the notice after them fixed that, and keeps the recorded content.
+- **The sandwich runner mounted, with the notice in its run area:** #sandwich became 2.11 phone screens (`screen-height`).
+- **#sandwich static with no notice:** at 390 its content ends 151 px above its two-screen foot, so the gap to the footer was flagged (`section-gaps`). Letting the section shrink to its content showed 151 px of the footer in its second screen (`neighbour`).
+- **The checker's rule** (`assets/layout/layout-check.js`): a phone section is one or two screens within 1.5 px, or grows only up to two screens. So #sandwich must stay exactly two screens, and whatever the hosted build adds there must fit in those 151 px. The planned compact notice fits with 18 px to spare at 390 (measured in headless Chrome), and the other sections use the same notice.
+
+Why the hosted gate builds into `dist-hosted/`: the skill's gate counts a round whenever the page it checks has changed. A hosted and a local build of the same `dist/app/index.html` alternating in one gate command would spend a round on every run and end in `GATE: OPEN (rounds used up)`. In its own folder the hosted page is its own build for the gate, as `landing` and `app` already are (`ui-gate.ts` arms with `--new` when another page's build is open).
+
+Exactly how the gate builds and checks the hosted site: `pnpm -C web ui-gate app --hosted` runs `tsc --noEmit`, then `vite build --outDir dist-hosted` with `VERCEL=1` added to the build's environment (the variable Vercel sets, so the real detection path is what is tested), removes `dist-hosted/deployment.json` (a local `public/deployment.json` would be copied; the public host has none), opens `dist-hosted/app/` in headless Chrome (`scripts/lib/hosted-check.ts`) and checks everything listed above, printing `HOSTED: OK (...)`, then arms and runs the skill's `gate.mjs` on `dist-hosted/app/index.html` with `--root dist-hosted`. Its last line is the gate's verdict.
+
+Verified by the architect on 2026-11-20 in a scratch clone at a path with a space, with this task's exact code: the new test file FAILs first (`Cannot find module '../lib/hosted'`); then tsc clean and `Tests  41 passed (41)` (28 before, 13 new); `IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)`, `LOCAL: OK`, `ui-gate app` `GATE: PASS`, and `ui-gate app --hosted` `HOSTED: OK (one hosted notice each in #trade, #book, #settle, #sandwich; ...)` then `GATE: PASS`; no open FAIL and no waiver in either build. The hosted gate's WARNs are the page's own (the local build shows the same kinds), plus `share-meta` (no `og:image` on `/app`), which Task 15 fixes; none comes from the notice.
+
+After this task is pushed (not part of the gate): Vercel redeploys from `main`. Open https://anyorder.suitz.xyz/app/ and check that #trade shows the hosted notice. If it still shows "The local chain is unavailable", the project's "Automatically expose System Environment Variables" setting is off; turning it on is the user's call, in the Vercel dashboard.
+
+Upstream interfaces this task uses, unchanged (from Tasks 5, 11 and 13):
+- `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)`: the gate wrapper; Step 9 replaces the whole file and keeps both runs as they were.
+- `findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)`, used by `hosted-check.ts`:
+```ts
+export function findChrome(): string | null
+export interface Page {
+  send<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>
+  evaluate<T>(expression: string): Promise<T>
+  goto(url: string): Promise<void>
+}
+export interface Browser { page: Page; close(): Promise<void> }
+export async function launchChrome(width: number, height: number): Promise<Browser>
+export async function serveDir(root: string): Promise<{ url: string; close(): Promise<void> }>
+```
+- `pnpm -C web exec tsx scripts/idle-check.ts -> last line IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)` and `pnpm -C web exec tsx scripts/local-check.ts -> last line LOCAL: OK`: unchanged, in the gate to prove the local build is as before (they build without `VERCEL`).
+- Also used, unchanged: `WEB_DIR` from `web/scripts/lib/repo.ts`, `startAnvil` from `web/scripts/lib/anvil.ts`, `deployLocal(rpcUrl?, outFile?, batchSeconds?)` from `web/scripts/deploy-local.ts`.
+
+- [ ] **Step 2: Write the failing test**
+Create `web/src/app/hosted.test.tsx` with exactly this content:
+```tsx
+/**
+ * dapp:14: hosted mode. A build on a public host shows one hosted notice per
+ * live island; every other build renders exactly what it rendered before.
+ */
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, test } from 'vitest'
+import type { ChainState } from '../chain/state'
+import { HOSTED, HOSTED_LINKS, isHostedBuild } from '../lib/hosted'
+import { islandMode } from './islands'
+import { ChainNotice, type Live, useLive } from './shared'
+
+const local = (chain: ChainState, stale = false): Live => ({ chain, stale, hosted: false })
+
+describe('isHostedBuild', () => {
+  test('a build on Vercel (VERCEL=1, set by Vercel) is hosted', () => {
+    expect(isHostedBuild({ VERCEL: '1' })).toBe(true)
+  })
+  test('any other build is local', () => {
+    expect(isHostedBuild({})).toBe(false)
+    expect(isHostedBuild({ VERCEL: '' })).toBe(false)
+    expect(isHostedBuild({ VERCEL: '0' })).toBe(false)
+  })
+  test('the unit tests run a local build', () => {
+    expect(HOSTED).toBe(false)
+  })
+})
+
+describe('the hosted notice', () => {
+  const html = renderToStaticMarkup(<ChainNotice live={{ chain: { kind: 'loading' }, stale: false, hosted: true }} />)
+  test('says what the app needs, how to run it, and where the video and the code are', () => {
+    expect(html).toContain('data-state="hosted"')
+    expect(html).toContain('This app needs a local Anvil chain (chain id 31337, Anvil dev accounts, test funds)')
+    expect(html).toContain('<code>pnpm -C web install</code>')
+    expect(html).toContain('<code>pnpm -C web local</code>')
+    expect(html).toContain(`href="${HOSTED_LINKS.video}"`)
+    expect(html).toContain(`href="${HOSTED_LINKS.repo}"`)
+    expect(HOSTED_LINKS).toEqual({ video: 'https://youtu.be/8QCVwiO_9c8', repo: 'https://github.com/Dotman-Bei/anyorder' })
+  })
+  test('replaces every state that is not live, with no error text and no Reconnect', () => {
+    const states: ChainState[] = [
+      { kind: 'loading' },
+      { kind: 'unavailable', reason: 'unreachable', detail: 'fetch failed' },
+      { kind: 'not-deployed', address: '0x0' },
+    ]
+    for (const chain of states) {
+      const out = renderToStaticMarkup(<ChainNotice live={{ chain, stale: false, hosted: true }} />)
+      expect(out).toBe(html)
+    }
+    expect(html).not.toContain('unavailable')
+    expect(html).not.toContain('Reconnect')
+  })
+})
+
+describe('a local build renders exactly what it rendered before dapp:14', () => {
+  test('loading', () => {
+    expect(renderToStaticMarkup(<ChainNotice live={local({ kind: 'loading' })} />)).toBe('<p class="chain-notice" data-state="loading">Reading the chain…</p>')
+  })
+  test('unreachable', () => {
+    expect(renderToStaticMarkup(<ChainNotice live={local({ kind: 'unavailable', reason: 'unreachable', detail: 'fetch failed' })} />)).toBe(
+      '<div class="chain-notice" data-state="unavailable" role="status"><p>The local chain is unavailable (fetch failed).</p><p><code>Start the local chain: pnpm -C web local</code></p><button type="button" class="btn">Reconnect</button></div>',
+    )
+  })
+  test('wrong chain', () => {
+    expect(renderToStaticMarkup(<ChainNotice live={local({ kind: 'unavailable', reason: 'wrong-chain', detail: 'chain id 1' })} />)).toBe(
+      '<div class="chain-notice" data-state="unavailable" role="status"><p>The local chain is unavailable (chain id 1).</p><p><code>Point the app at Anvil (chain id 31337): pnpm -C web local</code></p><button type="button" class="btn">Reconnect</button></div>',
+    )
+  })
+  test('not deployed', () => {
+    expect(renderToStaticMarkup(<ChainNotice live={local({ kind: 'not-deployed', address: '0x0' })} />)).toBe(
+      '<div class="chain-notice" data-state="not-deployed" role="status"><p>The contracts are not deployed on this chain.</p><p><code>Deploy the contracts: pnpm -C web deploy:local</code></p><button type="button" class="btn">Reconnect</button></div>',
+    )
+  })
+  test('live: nothing, or the stale line', () => {
+    const now = Date.now()
+    expect(renderToStaticMarkup(<ChainNotice live={local({ kind: 'live', block: 1n, blockTime: 1, seenAt: now })} />)).toBe('')
+    expect(renderToStaticMarkup(<ChainNotice live={local({ kind: 'live', block: 1n, blockTime: 1, seenAt: now - 120_000 }, true)} />)).toMatch(
+      /^<p class="chain-notice" data-state="stale">Data is .+: the chain stopped answering\.<\/p>$/,
+    )
+  })
+})
+
+describe('useLive and the islands', () => {
+  function Probe({ hosted }: { hosted?: boolean }) {
+    const live = hosted === undefined ? useLive() : useLive(hosted)
+    return <i data-hosted={String(live.hosted)} data-kind={live.chain.kind} />
+  }
+  test('useLive follows the build: local by default, hosted when asked', () => {
+    expect(renderToStaticMarkup(<Probe />)).toBe('<i data-hosted="false" data-kind="loading"></i>')
+    expect(renderToStaticMarkup(<Probe hosted={true} />)).toBe('<i data-hosted="true" data-kind="loading"></i>')
+  })
+  test('a local build mounts every island', () => {
+    for (const name of ['batch', 'trade', 'wallet', 'book', 'settle', 'sandwich']) expect(islandMode(name, false)).toBe('mount')
+  })
+  test('a hosted build keeps the hero card and the wallet panel static, and adds the notice to #trade, #book, #settle and #sandwich', () => {
+    for (const name of ['batch', 'wallet']) expect(islandMode(name, true)).toBe('static')
+    for (const name of ['trade', 'book', 'settle', 'sandwich']) expect(islandMode(name, true)).toBe('notice')
+  })
+})
+```
+
+- [ ] **Step 3: Run it to confirm it fails**
+Run: `NO_COLOR=1 pnpm -C web test`
+Expected: FAIL: `FAIL  src/app/hosted.test.tsx`, `Error: Cannot find module '../lib/hosted'`, `Test Files  1 failed | 5 passed (6)`, `Tests  28 passed (28)`
+
+- [ ] **Step 4: The build-time flag**
+Create `web/src/lib/hosted.ts` with exactly this content:
+```ts
+/**
+ * dapp:14: hosted mode. A build for a public host has no chain to read, so the
+ * live islands of /app say how to run the app locally instead of showing the
+ * "unavailable" state. vite.config.ts decides once, at build time: Vercel sets
+ * VERCEL=1 in every build it runs, so nothing is set in its dashboard. Every
+ * other build (pnpm -C web local, ui-gate app, pnpm -C web build without
+ * VERCEL) is a local build and renders exactly what it rendered before.
+ */
+
+/** Replaced by vite.config.ts's `define`; undefined wherever Vite did not build the code. */
+declare const __ANYORDER_HOSTED__: boolean | undefined
+
+/** True when the build runs on Vercel: VERCEL is set to anything but empty or "0". */
+export function isHostedBuild(env: Readonly<Record<string, string | undefined>>): boolean {
+  const vercel = env['VERCEL']
+  return vercel !== undefined && vercel !== '' && vercel !== '0'
+}
+
+/** This build's mode: true only in a build that vite.config.ts made for a public host. */
+export const HOSTED: boolean = typeof __ANYORDER_HOSTED__ === 'boolean' ? __ANYORDER_HOSTED__ : false
+
+/** Where a visitor of the hosted site sees the app run, and its code. */
+export const HOSTED_LINKS = {
+  video: 'https://youtu.be/8QCVwiO_9c8',
+  repo: 'https://github.com/Dotman-Bei/anyorder',
+} as const
+```
+Replace `web/vite.config.ts` with exactly this content:
+```ts
+import { existsSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { type Plugin, defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { isHostedBuild } from './src/lib/hosted'
+import { type Recording, injectRecorded, recordedTokens } from './src/lib/recorded'
+
+const page = (path: string): string => fileURLToPath(new URL(path, import.meta.url))
+
+// Bakes the recorded sandwich run into both pages at build time ({{rec:<key>}}
+// tokens), so they read correctly with scripts off. No recording, no build:
+// a page never shows a blank where a number belongs.
+function recorded(): Plugin {
+  const file = page('./public/recorded/sandwich.json')
+  return {
+    name: 'anyorder-recorded',
+    transformIndexHtml(html) {
+      if (!html.includes('{{rec:')) return html
+      if (!existsSync(file)) throw new Error('public/recorded/sandwich.json is missing: run pnpm -C web scenario')
+      return injectRecorded(html, recordedTokens(JSON.parse(readFileSync(file, 'utf8')) as Recording))
+    },
+  }
+}
+
+// Two static pages: the landing page at / and the dApp at /app. Vite's own
+// bundles go to _app/ so they never mix with the design kit's files, which
+// are served unmodified from public/assets/.
+export default defineConfig({
+  plugins: [react(), recorded()],
+  // dapp:14: a build on Vercel (VERCEL=1, set by Vercel in every build) is the
+  // hosted build, whose live islands explain that the app needs a local chain.
+  // Every other build is local and unchanged.
+  define: { __ANYORDER_HOSTED__: JSON.stringify(isHostedBuild(process.env)) },
+  build: {
+    assetsDir: '_app',
+    rollupOptions: {
+      input: {
+        landing: page('./index.html'),
+        app: page('./app/index.html'),
+      },
+    },
+  },
+})
+```
+
+- [ ] **Step 5: The hosted notice, and no fetch in a hosted build**
+In `web/src/app/live.ts`, replace
+```ts
+export function useDeployment(): { deployment?: Deployment; error?: string } {
+  const [state, setState] = useState<{ deployment?: Deployment; error?: string }>({})
+  useEffect(() => {
+    loadDeployment('/deployment.json')
+      .then((deployment) => setState({ deployment }))
+      .catch((e: unknown) => setState({ error: e instanceof Error ? e.message : String(e) }))
+  }, [])
+  return state
+}
+```
+with exactly
+```ts
+/** Reads /deployment.json once; with `enabled` false (a hosted build) it reads nothing and stays empty. */
+export function useDeployment(enabled = true): { deployment?: Deployment; error?: string } {
+  const [state, setState] = useState<{ deployment?: Deployment; error?: string }>({})
+  useEffect(() => {
+    if (!enabled) return
+    loadDeployment('/deployment.json')
+      .then((deployment) => setState({ deployment }))
+      .catch((e: unknown) => setState({ error: e instanceof Error ? e.message : String(e) }))
+  }, [enabled])
+  return state
+}
+```
+Nothing else in `live.ts` changes. Replace `web/src/app/shared.tsx` with exactly this content (the selected-trader store, `errorName`, `TRADER_NOTE` and every local branch of `ChainNotice` are unchanged; new are `Live.hosted`, `useLive(hosted)`, `HostedNotice` and the first line of `ChainNotice`):
+```tsx
+/**
+ * What every island shares: the selected trader (a tiny store, because each
+ * island is its own React root), the live chain hooks, error decoding and the
+ * notice shown for every state that is not live (on a public host, dapp:14,
+ * the hosted notice in its place).
+ */
+import { useSyncExternalStore } from 'react'
+import { BaseError, ContractFunctionRevertedError } from 'viem'
+import type { Clients } from '../chain/client'
+import type { Deployment } from '../chain/deployment'
+import { type ChainState, RECOVERY } from '../chain/state'
+import { formatAge } from '../lib/format'
+import { HOSTED, HOSTED_LINKS } from '../lib/hosted'
+import { useChain, useClients, useDeployment } from './live'
+
+let selected = 0
+const listeners = new Set<() => void>()
+
+export function selectTrader(index: number): void {
+  selected = index
+  for (const listener of listeners) listener()
+}
+
+export function useSelectedTrader(): number {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    () => selected,
+  )
+}
+
+export interface Live {
+  deployment?: Deployment
+  clients?: Clients
+  chain: ChainState
+  stale: boolean
+  error?: string
+  /** A build for a public host (dapp:14): nothing is read, and every notice is the hosted notice. */
+  hosted: boolean
+}
+
+export function useLive(hosted: boolean = HOSTED): Live {
+  const { deployment, error } = useDeployment(!hosted)
+  const clients = useClients(deployment)
+  const { state, stale } = useChain(deployment, clients)
+  return {
+    ...(deployment ? { deployment } : {}),
+    ...(clients ? { clients } : {}),
+    chain: error ? { kind: 'unavailable', reason: 'unreachable', detail: error } : state,
+    stale,
+    ...(error ? { error } : {}),
+    hosted,
+  }
+}
+
+/** The contract's custom error name, or the first line of the message. */
+export function errorName(error: unknown): string {
+  if (error instanceof BaseError) {
+    const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError)
+    if (reverted instanceof ContractFunctionRevertedError) return reverted.data?.errorName ?? reverted.shortMessage
+    return error.shortMessage
+  }
+  return error instanceof Error ? (error.message.split('\n')[0] ?? 'failed') : String(error)
+}
+
+/** dapp:14: on a public host, the one notice in place of every state that is not live. */
+export function HostedNotice() {
+  return (
+    <div className="chain-notice" data-state="hosted" role="note">
+      <p>
+        This app needs a local Anvil chain (chain id 31337, Anvil dev accounts, test funds): <code>pnpm -C web install</code>, then <code>pnpm -C web local</code>.
+      </p>
+      <p className="chain-notice__links">
+        <a href={HOSTED_LINKS.video}>Watch the demo video</a>
+        <a href={HOSTED_LINKS.repo}>Source on GitHub</a>
+      </p>
+    </div>
+  )
+}
+
+/** Shown in place of an island's data whenever the chain is not live. */
+export function ChainNotice({ live }: { live: Live }) {
+  if (live.hosted) return <HostedNotice />
+  const s = live.chain
+  if (s.kind === 'live') {
+    return live.stale ? <p className="chain-notice" data-state="stale">Data is {formatAge(Date.now() - s.seenAt)}: the chain stopped answering.</p> : null
+  }
+  if (s.kind === 'loading') return <p className="chain-notice" data-state="loading">Reading the chain…</p>
+  const text = s.kind === 'not-deployed' ? RECOVERY['not-deployed'] : RECOVERY[s.reason]
+  return (
+    <div className="chain-notice" data-state={s.kind === 'not-deployed' ? 'not-deployed' : 'unavailable'} role="status">
+      <p>{s.kind === 'not-deployed' ? 'The contracts are not deployed on this chain.' : `The local chain is unavailable (${s.detail}).`}</p>
+      <p>
+        <code>{text}</code>
+      </p>
+      <button type="button" className="btn" onClick={() => window.location.reload()}>
+        Reconnect
+      </button>
+    </div>
+  )
+}
+
+export const TRADER_NOTE = 'Anvil dev accounts. Test funds, no real value.'
+```
+
+- [ ] **Step 6: What a hosted build mounts**
+Replace `web/src/app/islands.tsx` with exactly this content:
+```tsx
+/**
+ * The island registry beyond the hero. Each UI task that adds an island adds
+ * one line here (B6 trade, B7 book and settle, B8 sandwich, B10 wallet).
+ */
+import type { ReactNode } from 'react'
+import { BookTable, SettlePanel } from './BookAndSettle'
+import { SandwichRunner } from './SandwichRunner'
+import { TradePanel } from './TradePanel'
+import { WalletPanel } from './WalletPanel'
+
+export const islands: Record<string, () => ReactNode> = {
+  trade: () => <TradePanel />,
+  book: () => <BookTable />,
+  settle: () => <SettlePanel />,
+  sandwich: () => <SandwichRunner />,
+  wallet: () => <WalletPanel />,
+}
+
+/**
+ * How this build treats the island named `name`:
+ *   'mount'   renders the island (every island of a local build);
+ *   'static'  leaves its static HTML as built (hosted: the hero card keeps its
+ *             recorded figure, and #trade's notice speaks for the wallet panel);
+ *   'notice'  keeps its static HTML and adds the hosted notice at its end
+ *             (hosted: #trade, #book, #settle and #sandwich, whose panels hold
+ *             the traders, how clearing reads the book, the recorded cleared
+ *             batch and the recorded sandwich table).
+ * dapp:14. Each section of a hosted /app shows one notice at most.
+ */
+export type IslandMode = 'mount' | 'static' | 'notice'
+
+const HOSTED_MODES: Readonly<Record<string, IslandMode>> = { batch: 'static', wallet: 'static', trade: 'notice', book: 'notice', settle: 'notice', sandwich: 'notice' }
+
+export function islandMode(name: string, hosted: boolean): IslandMode {
+  return hosted ? (HOSTED_MODES[name] ?? 'mount') : 'mount'
+}
+```
+Replace `web/src/app/main.tsx` with exactly this content:
+```tsx
+/**
+ * Mounts the islands of /app. The page is static HTML built to the design
+ * skill's recipes; each island replaces only the content of its
+ * `[data-island]` element, so the page reads correctly with scripts off.
+ * A hosted build (dapp:14) mounts only what islandMode() says.
+ */
+import type { ReactNode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { HOSTED } from '../lib/hosted'
+import { BatchHero } from './BatchHero'
+import { islandMode, islands } from './islands'
+import { HostedNotice } from './shared'
+
+const registry: Record<string, () => ReactNode> = { batch: () => <BatchHero />, ...islands }
+
+// dapp:14: the page's CSS sizes a hosted build's sections for their static panels.
+if (HOSTED) document.documentElement.dataset['hosted'] = 'true'
+
+for (const element of document.querySelectorAll<HTMLElement>('[data-island]')) {
+  const name = element.dataset['island'] ?? ''
+  const render = registry[name]
+  if (!render) continue
+  const mode = islandMode(name, HOSTED)
+  if (mode === 'mount') createRoot(element).render(render())
+  if (mode === 'notice') {
+    const slot = document.createElement('div')
+    slot.className = 'hosted-slot'
+    element.append(slot)
+    createRoot(slot).render(<HostedNotice />)
+  }
+}
+```
+
+- [ ] **Step 7: Types and unit tests**
+Run: `pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test`
+Expected: no tsc output, then `Test Files  6 passed (6)` and `Tests  41 passed (41)`
+
+- [ ] **Step 8: The notice's CSS and the hosted phone layout**
+In `web/app/index.html`, directly after the line
+```css
+.chain-notice code, .ui code, .closing__cta code { font-family: var(--font-mono); font-size: 0.92em; }
+```
+insert exactly
+```css
+.hosted-slot { padding: var(--s-4); border-top: 1px solid var(--u-line); }
+.chain-notice__links { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); }
+.chain-notice__links a { color: var(--p-ink); text-decoration: underline; text-underline-offset: 0.2em; }
+.chain-notice[data-state="hosted"] code { white-space: nowrap; }
+/* at 390 #sandwich is two screens with 151px to spare: its notice is the compact one */
+#sandwich .hosted-slot { padding: var(--s-2) var(--s-4) var(--s-3); }
+#sandwich .hosted-slot .chain-notice { gap: var(--s-2); }
+#sandwich .chain-notice__links { gap: var(--s-1) var(--s-4); }
+```
+and directly after the line
+```css
+@media (max-width: 639px) { #trade { --hm: 2; } }
+```
+insert exactly
+```css
+/* dapp:14: a hosted build (<html data-hosted>) holds static panels and the notice, not the live ticket
+   and tables: on a phone #trade, #book and #settle each take what their content fills, one screen at least */
+@media (max-width: 639px) {
+  :root[data-hosted] :is(#trade, #book, #settle) { --hm: 1; }
+  :root[data-hosted] :is(#book, #settle) .frame { min-height: 0; }
+}
+```
+Nothing in `<body>` changes. Every new rule matches only in a hosted build: `.hosted-slot` and `[data-state="hosted"]` exist only there, and `:root[data-hosted]` is set only there. The local page is untouched.
+
+- [ ] **Step 9: The hosted gate**
+Replace `web/scripts/lib/proc.ts` with exactly this content (`run` and `runChecked` take an optional `env`; without it they pass this process's own environment, as before):
+```ts
+/**
+ * Child processes with argument arrays, never a shell string, so paths with
+ * spaces (this repo lives under "VIBE CODE") pass through unchanged.
+ */
+import { type ChildProcess, spawn } from 'node:child_process'
+
+export interface RunResult {
+  code: number
+  stdout: string
+  stderr: string
+}
+
+/** `env` replaces the child's environment (default: this process's own). */
+export function run(command: string, args: readonly string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<RunResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, [...args], { cwd: options.cwd, env: options.env ?? process.env, shell: false, windowsHide: true })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
+    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()))
+    child.on('error', reject)
+    child.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }))
+  })
+}
+
+/** Runs a command and throws with its output if it fails. */
+export async function runChecked(command: string, args: readonly string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<string> {
+  const result = await run(command, args, options)
+  if (result.code !== 0) {
+    throw new Error(`${command} ${args.join(' ')} exited ${result.code}\n${result.stdout}\n${result.stderr}`)
+  }
+  return result.stdout
+}
+
+export interface Running {
+  child: ChildProcess
+  stop(): Promise<void>
+}
+
+/** Starts a long-running process; `stop` ends it and waits for it to exit. */
+export function start(command: string, args: readonly string[], options: { cwd?: string; inherit?: boolean } = {}): Running {
+  const child = spawn(command, [...args], {
+    cwd: options.cwd,
+    shell: false,
+    windowsHide: true,
+    stdio: options.inherit === true ? 'inherit' : 'ignore',
+  })
+  return {
+    child,
+    stop: () =>
+      new Promise<void>((resolve) => {
+        if (child.exitCode !== null || child.killed) return resolve()
+        child.once('exit', () => resolve())
+        child.kill()
+      }),
+  }
+}
+```
+Create `web/scripts/lib/hosted-check.ts` with exactly this content:
+```ts
+/**
+ * dapp:14: what a visitor of the hosted build sees on /app. Opens the built
+ * page from `distDir` in headless Chrome (scripts/lib/chrome.ts) and checks:
+ *   - #trade, #book, #settle and #sandwich each show exactly one hosted notice,
+ *     with both commands, chain id 31337, Anvil dev accounts, test funds, the
+ *     demo video and the repo link, after their static panel (the traders, how
+ *     clearing reads the book, the recorded cleared batch, the recorded
+ *     sandwich table);
+ *   - no other chain notice shows anywhere (no "unavailable", no Reconnect);
+ *   - the hero card keeps its recorded figure and the sandwich panel its
+ *     recorded table, each labelled "Recorded on a local Anvil chain", with no
+ *     live part (no live batch, no run button);
+ *   - the wallet island stays empty, and <html> carries data-hosted;
+ *   - the page asked for no /deployment.json and no RPC.
+ * Returns null when all of it holds, else what is wrong.
+ */
+import { launchChrome, serveDir } from './chrome'
+
+const WAIT_MS = 15_000
+const ISLANDS = ['trade', 'book', 'settle', 'sandwich']
+const LINKS = ['https://youtu.be/8QCVwiO_9c8', 'https://github.com/Dotman-Bei/anyorder']
+const WORDS = ['pnpm -C web install', 'pnpm -C web local', 'chain id 31337', 'Anvil dev accounts, test funds']
+
+interface HostedView {
+  notices: { island: string; text: string; links: string[] }[]
+  others: string[]
+  panels: string[]
+  heroRecorded: boolean
+  heroLive: boolean
+  sandwichSource: string
+  sandwichTable: boolean
+  sandwichRun: boolean
+  walletChildren: number
+  marked: boolean
+  requests: string[]
+}
+
+const READ = `(() => ({
+  notices: [...document.querySelectorAll('.chain-notice[data-state="hosted"]')].map((n) => ({
+    island: n.closest('[data-island]')?.getAttribute('data-island') ?? '?',
+    text: n.textContent ?? '',
+    links: [...n.querySelectorAll('a')].map((a) => a.href.replace(/\\/$/, '')),
+  })),
+  others: [...document.querySelectorAll('.chain-notice:not([data-state="hosted"])')].map((n) => n.getAttribute('data-state') ?? '?'),
+  panels: ['trade', 'book', 'settle'].map((i) => document.querySelector('[data-island="' + i + '"]')?.textContent ?? ''),
+  heroRecorded: (document.querySelector('[data-island="batch"]')?.textContent ?? '').includes('Recorded on a local Anvil chain'),
+  heroLive: document.querySelector('[data-island="batch"] .batch-live') !== null,
+  sandwichSource: document.querySelector('[data-island="sandwich"] .sandwich__source')?.textContent ?? '',
+  sandwichTable: document.querySelector('[data-island="sandwich"] table.contrast') !== null,
+  sandwichRun: document.querySelector('[data-island="sandwich"] .sandwich__run') !== null,
+  walletChildren: document.querySelector('[data-island="wallet"]')?.childElementCount ?? -1,
+  marked: document.documentElement.dataset.hosted === 'true',
+  requests: performance.getEntriesByType('resource').map((e) => e.name),
+}))()`
+
+export async function checkHosted(distDir: string): Promise<string | null> {
+  const server = await serveDir(distDir)
+  const browser = await launchChrome(1440, 900)
+  try {
+    await browser.page.goto(`${server.url}/app/`)
+    let view = await browser.page.evaluate<HostedView>(READ)
+    for (let waited = 0; waited < WAIT_MS && view.notices.length < ISLANDS.length; waited += 500) {
+      await new Promise((r) => setTimeout(r, 500))
+      view = await browser.page.evaluate<HostedView>(READ)
+    }
+    // Long enough for a poll or a late fetch to show among the requests.
+    await new Promise((r) => setTimeout(r, 3000))
+    view = await browser.page.evaluate<HostedView>(READ)
+    const problems: string[] = []
+    const islands = view.notices.map((n) => n.island)
+    if (islands.join(',') !== ISLANDS.join(',')) problems.push(`hosted notices in [${islands.join(', ')}], want [${ISLANDS.join(', ')}]`)
+    for (const n of view.notices) {
+      for (const want of WORDS) if (!n.text.includes(want)) problems.push(`#${n.island} notice lacks "${want}"`)
+      for (const want of LINKS) if (!n.links.includes(want)) problems.push(`#${n.island} notice lacks the link ${want}`)
+    }
+    if (view.others.length > 0) problems.push(`other chain notices show: ${view.others.join(', ')}`)
+    const [trade = '', book = '', settle = ''] = view.panels
+    if (!trade.includes('Maker 1') || !trade.includes('Attacker')) problems.push('#trade lost its static list of traders')
+    if (!book.includes('How clearing reads the book')) problems.push('#book lost its static panel')
+    if (!settle.includes('Recorded on a local Anvil chain')) problems.push('#settle lost its recorded cleared batch')
+    if (!view.heroRecorded || view.heroLive) problems.push('the hero card is not its recorded figure')
+    if (!view.sandwichTable || !view.sandwichSource.startsWith('Recorded on a local Anvil chain') || view.sandwichRun) {
+      problems.push('the sandwich panel is not its recorded table')
+    }
+    if (!view.marked) problems.push('<html> lacks data-hosted="true"')
+    if (view.walletChildren !== 0) problems.push(`the wallet island has ${view.walletChildren} element(s), want none`)
+    const asked = view.requests.filter((r) => r.includes('deployment.json') || /:(8545|8546|8547)\b/.test(r))
+    if (asked.length > 0) problems.push(`the page asked for ${asked.join(', ')}`)
+    return problems.length === 0 ? null : problems.join('; ')
+  } finally {
+    await browser.close()
+    await server.close()
+  }
+}
+```
+Replace `web/scripts/ui-gate.ts` with exactly this content:
+```ts
+/**
+ * The single gate command of every UI task:
+ *
+ *   pnpm -C web ui-gate landing         the landing page, dist/index.html
+ *   pnpm -C web ui-gate app             the dApp, dist/app/index.html, against a seeded chain
+ *   pnpm -C web ui-gate app --hosted    the dApp as the public host builds it (dapp:14),
+ *                                       dist-hosted/app/index.html
+ *
+ * 1. Builds dist/ (tsc + vite build). A local build runs without VERCEL in its
+ *    environment, so it is local wherever it runs; --hosted builds with
+ *    VERCEL=1, exactly as Vercel does, which turns hosted mode on, into
+ *    dist-hosted/ (git-ignored). Its own folder makes it its own page for the
+ *    skill's gate, as landing and app are: alternating it with the local app
+ *    build in one folder would spend a round on every run.
+ * 2. app only: starts its own Anvil on 127.0.0.1:8546 (a dev chain on 8545 is
+ *    never touched), builds and deploys the contracts, funds the traders,
+ *    seeds the demo state with one-hour batches (so nothing changes during the
+ *    check) and writes dist/deployment.json for the built app to read.
+ *    --hosted: no chain at all. It removes dist-hosted/deployment.json (the public host
+ *    has none) and checks the built page in headless Chrome
+ *    (scripts/lib/hosted-check.ts): last line before the gate's output is
+ *    "HOSTED: OK", else "HOSTED: FAIL (...)" and exit 1 without the gate.
+ * 3. Arms the design-taste-frontend finish gate for this page unless a build
+ *    for this page is already open in web/.taste-skill/ (git-ignored).
+ * 4. Runs the skill's gate.mjs on the built page, prints its output, stops
+ *    Anvil, and exits with the gate's code. Its last line is the verdict:
+ *    "GATE: PASS" is the only accepted result.
+ *
+ * The skill is never copied into the repo: gate.mjs runs from the skill's
+ * install folder (~/.claude/skills/design-taste-frontend).
+ */
+import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { type Anvil, startAnvil } from './lib/anvil'
+import { checkHosted } from './lib/hosted-check'
+import { run, runChecked } from './lib/proc'
+import { WEB_DIR } from './lib/repo'
+import { deployLocal } from './deploy-local'
+
+const GATE = join(homedir(), '.claude', 'skills', 'design-taste-frontend', 'scripts', 'gate.mjs')
+const CATEGORY = 'a batch-auction exchange for Ethereum traders'
+const PAGES = {
+  landing: { page: 'dist/index.html', primary: 'Open the app' },
+  app: { page: 'dist/app/index.html', primary: 'Place an order' },
+} as const
+const HOSTED_PAGE = 'dist-hosted/app/index.html'
+type PageName = keyof typeof PAGES
+
+function openBuildPage(): string | null | undefined {
+  const marker = join(WEB_DIR, '.taste-skill', 'build.json')
+  if (!existsSync(marker)) return undefined
+  try {
+    const page = (JSON.parse(readFileSync(marker, 'utf8')) as { page?: string | null }).page
+    return typeof page === 'string' ? page.replace(/\\/g, '/') : null
+  } catch {
+    return null
+  }
+}
+
+async function main(): Promise<number> {
+  const name = process.argv[2]
+  const hosted = process.argv.includes('--hosted')
+  if ((name !== 'landing' && name !== 'app') || (hosted && name !== 'app')) {
+    console.log('usage: pnpm -C web ui-gate landing|app [--hosted, app only]')
+    return 2
+  }
+  const primary = PAGES[name as PageName].primary
+  const root = hosted ? 'dist-hosted' : 'dist'
+  const page = hosted ? HOSTED_PAGE : PAGES[name as PageName].page
+  if (!existsSync(GATE)) {
+    console.log(`GATE: SETUP (the design-taste-frontend skill is not installed at ${GATE})`)
+    return 3
+  }
+  await runChecked(process.execPath, [join(WEB_DIR, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit'], { cwd: WEB_DIR })
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  if (hosted) env['VERCEL'] = '1'
+  else delete env['VERCEL']
+  await runChecked(process.execPath, [join(WEB_DIR, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--outDir', root], { cwd: WEB_DIR, env })
+
+  let anvil: Anvil | undefined
+  try {
+    if (hosted) {
+      rmSync(join(WEB_DIR, root, 'deployment.json'), { force: true })
+      const problem = await checkHosted(join(WEB_DIR, root))
+      if (problem !== null) {
+        console.log(`HOSTED: FAIL (${problem})`)
+        return 1
+      }
+      console.log('HOSTED: OK (one hosted notice each in #trade, #book, #settle, #sandwich; static panels, recorded hero and sandwich table kept; no deployment.json or RPC request)')
+    } else if (name === 'app') {
+      anvil = await startAnvil(8546)
+      await deployLocal(anvil.rpcUrl, join(WEB_DIR, 'dist', 'deployment.json'), 3600)
+    }
+    const open = openBuildPage()
+    if (open !== page) {
+      const arm = ['--start', page, '--root', root, '--kind', 'software', '--category', CATEGORY, '--primary', primary]
+      if (open !== undefined) arm.push('--new')
+      await runChecked(process.execPath, [GATE, ...arm], { cwd: WEB_DIR })
+    }
+    const result = await run(process.execPath, [GATE, page, '--root', root], { cwd: WEB_DIR })
+    process.stdout.write(result.stdout)
+    process.stderr.write(result.stderr)
+    return result.code
+  } finally {
+    await anvil?.stop()
+  }
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((error: unknown) => {
+    console.log(`GATE: ERROR (${error instanceof Error ? error.message.split('\n')[0] : String(error)})`)
+    process.exit(2)
+  })
+```
+In `.gitignore`, directly after the line `web/dist/`, insert the line `web/dist-hosted/`.
+
+- [ ] **Step 10: Gate: types, unit tests, the idle and local checks, then the skill's gate on the local and the hosted build**
+Fix every FAIL the skill's gate lists and run it again (three rounds at most per build). Then report both `GATE:` lines, the `HOSTED:` line, every waiver with its reason (none for `kit-edited`), and each section 5 checklist line of SKILL.md with the check ids that cover it, for each of the two builds. The local build must still pass `IDLE: OK` and `LOCAL: OK`: they prove the local app is live, goes unavailable when Anvil stops, and that the one-command run serves and stops as before. Measured by the architect with this exact code: `Tests  41 passed (41)`, `IDLE: OK (...)`, `LOCAL: OK`, `GATE: PASS` (local), `HOSTED: OK (...)`, `GATE: PASS` (hosted), no waiver. Once, in one of the architect's runs, the hosted run ended `GATE: ERROR (consistency.mjs could not walk 1440, 390)`: the checker's own page walk failed on the CPU Chrome ("no FAIL in what ran", counted as no round), and the next run of the unchanged page gave `GATE: PASS`. If you see it, report it as the gate tells you; the orchestrator re-runs the gate.
+Run: `pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test && pnpm -C web exec tsx scripts/idle-check.ts && pnpm -C web exec tsx scripts/local-check.ts && pnpm -C web ui-gate app && pnpm -C web ui-gate app --hosted`
+Expected: PASS — `GATE: PASS`
+
+- [ ] **Step 11: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `feat(dapp): hosted mode, /app on a public host says how to run it locally`
+
+---
+
+### Task 15: Absolute share URLs on the real domain
+
+**Files:**
+- Modify: `web/index.html`
+- Modify: `web/app/index.html`
+- Modify: `web/scripts/share-image.ts`
+
+**Depends on:** Task 14
+**Effort:** low
+**Model tier:** top
+**Provides:** `share meta on https://anyorder.suitz.xyz/ and /app/ (absolute og:image and twitter:image, og:url, canonical) + pnpm -C web exec tsx scripts/share-image.ts --check -> last line SHARE: OK 1200x630 <bytes> bytes, meta on / and /app/`
+**Requires:** `web/public/share.jpg (1200x630 still of the built landing page) + pnpm -C web exec tsx scripts/share-image.ts [--check] -> last line SHARE: OK 1200x630 <bytes> bytes`, `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)`
+
+- [ ] **Step 1: Read the skill first, then the context**
+Read `~/.claude/skills/design-taste-frontend/SKILL.md` in full, then the references named in this plan's conventions (`references/system.md`, Head, covers the share meta). **Do not change either page's visual design:** no markup in `<body>`, no CSS, no copy; the only changes are the `<head>` lines below. Never edit a kit file, never add a waiver for `kit-edited`.
+
+Context (added 2026-11-20): the site now has its domain, https://anyorder.suitz.xyz/ (Vercel). Task 12 made `web/public/share.jpg` (1200x630, served at https://anyorder.suitz.xyz/share.jpg, 200 `image/jpeg` when the architect checked) and gave `web/index.html` a root-relative `og:image` and `twitter:image` (`/share.jpg`), which some link-preview crawlers do not resolve. `web/app/index.html` has no image meta at all. Both pages carry the comment `<!-- <link rel="canonical" ...> once a domain exists -->`. This task makes both image URLs absolute, gives `/app/` the same image meta as `/` (the same image, size and alt text: the image is the landing page, and the alt says so), and adds `og:url` and the canonical link, each to the page's own URL (`/app/` with its trailing slash: Vercel serves `/app/` and `/app` with 200). `og:type`, `og:title`, `og:description`, `twitter:card`, the image size and the alt text stay exactly as they are. The image itself is not recaptured.
+
+Task 12's `share-image.ts --check` verified the root-relative lines in `web/index.html` only. Its check now verifies both pages: each must carry its own `og:title`, the shared `og:description`, `og:url` and the canonical link with its own URL, `twitter:card`, the absolute `og:image` and `twitter:image`, the image width, height and alt, and no root-relative `og:image` or `twitter:image` may be left. The capture code (`capture()`) is unchanged. Verified by the architect on 2026-11-20 in a spaced scratch clone, on top of Task 14's code: `--check` FAILs before the meta edits (`SHARE: FAIL (web/index.html lacks <meta property="og:url" ...`), and after them the gate gives `SHARE: OK 1200x630 84107 bytes, meta on / and /app/` and `GATE: PASS`, no waiver.
+
+Upstream, from Tasks 12 and 5: `web/public/share.jpg (1200x630 still of the built landing page) + pnpm -C web exec tsx scripts/share-image.ts [--check] -> last line SHARE: OK 1200x630 <bytes> bytes` (Step 2 replaces the script; its capture path, `jpegSize` and image checks are unchanged, and the image is not touched) and `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)` (as Task 14 left it; `landing` builds `dist/` without `VERCEL`).
+
+- [ ] **Step 2: The check**
+Replace `web/scripts/share-image.ts` with exactly this content:
+```ts
+/**
+ * dapp:12: the link-preview image is a still of the real built landing page.
+ * Builds dist/, serves it on 127.0.0.1, opens / in headless Chrome launched the
+ * way the design skill's gate launches it (scripts/lib/chrome.ts), lays the
+ * page out at 1440 x 756 (the desktop width the gate judges, at 1200 x 630's
+ * ratio), waits for the fonts and the hero's entrance, and captures the first
+ * screen scaled to 1200 x 630 as JPEG into public/share.jpg, lowering the
+ * quality in steps until the file is under 300 KB. Nothing is drawn or
+ * generated: the pixels are the page's.
+ *
+ * dapp:15: the check also proves both pages' share meta: og:image and
+ * twitter:image are absolute URLs on the real domain, og:url and the canonical
+ * link name each page's own URL, and no root-relative image URL is left.
+ *
+ *   pnpm -C web exec tsx scripts/share-image.ts           capture, then check
+ *   pnpm -C web exec tsx scripts/share-image.ts --check   check the committed image and meta only
+ *   last line: SHARE: OK 1200x630 <bytes> bytes, meta on / and /app/
+ */
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { launchChrome, serveDir } from './lib/chrome'
+import { runChecked } from './lib/proc'
+import { WEB_DIR } from './lib/repo'
+
+const OUT = join(WEB_DIR, 'public', 'share.jpg')
+const MAX_BYTES = 300 * 1024
+const WIDTH = 1200
+const HEIGHT = 630
+const LAYOUT_WIDTH = 1440
+const LAYOUT_HEIGHT = 756
+const SETTLE_MS = 4000
+
+/** Width and height from a JPEG's start-of-frame segment, or null when the bytes are not a JPEG. */
+function jpegSize(buf: Buffer): { width: number; height: number } | null {
+  if (buf[0] !== 0xff || buf[1] !== 0xd8) return null
+  let i = 2
+  while (i + 9 < buf.length) {
+    if (buf[i] !== 0xff) return null
+    const marker = buf[i + 1] ?? 0
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) {
+      i += 2
+      continue
+    }
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) }
+    }
+    i += 2 + buf.readUInt16BE(i + 2)
+  }
+  return null
+}
+
+/** The domain the site is served on (Vercel, dapp:15). */
+const SITE = 'https://anyorder.suitz.xyz'
+
+/** Each page's file, its URL path and its own og:title. */
+const PAGES = [
+  { file: 'index.html', name: 'web/index.html', path: '/', title: 'AnyOrder: a batch-auction exchange for Ethereum traders' },
+  { file: join('app', 'index.html'), name: 'web/app/index.html', path: '/app/', title: 'AnyOrder: a batch exchange for Ethereum traders' },
+] as const
+
+/** The share lines each page must carry, exactly. */
+function metaFor(page: (typeof PAGES)[number]): string[] {
+  return [
+    `<meta property="og:title" content="${page.title}">`,
+    '<meta property="og:description" content="One clearing price per batch, computed by the contract, whatever order the transactions arrive in.">',
+    `<meta property="og:url" content="${SITE}${page.path}">`,
+    '<meta name="twitter:card" content="summary_large_image">',
+    `<meta property="og:image" content="${SITE}/share.jpg">`,
+    '<meta property="og:image:width" content="1200">',
+    '<meta property="og:image:height" content="630">',
+    '<meta property="og:image:alt" content="The AnyOrder landing page: a one-price batch exchange for Ethereum traders, beside a recorded cleared batch.">',
+    `<meta name="twitter:image" content="${SITE}/share.jpg">`,
+    `<link rel="canonical" href="${SITE}${page.path}">`,
+  ]
+}
+
+function check(): boolean {
+  if (!existsSync(OUT)) {
+    console.log('SHARE: FAIL (web/public/share.jpg is missing)')
+    return false
+  }
+  const buf = readFileSync(OUT)
+  const size = jpegSize(buf)
+  if (!size || size.width !== WIDTH || size.height !== HEIGHT) {
+    console.log(`SHARE: FAIL (share.jpg is ${size ? `${size.width}x${size.height}` : 'not a JPEG'}, want ${WIDTH}x${HEIGHT})`)
+    return false
+  }
+  if (buf.length >= MAX_BYTES) {
+    console.log(`SHARE: FAIL (share.jpg is ${buf.length} bytes, want under ${MAX_BYTES})`)
+    return false
+  }
+  for (const page of PAGES) {
+    const html = readFileSync(join(WEB_DIR, page.file), 'utf8')
+    const missing = metaFor(page).filter((m) => !html.includes(m))
+    if (missing.length > 0) {
+      console.log(`SHARE: FAIL (${page.name} lacks ${missing.join(' ')})`)
+      return false
+    }
+    const relative = /<meta (?:property|name)="(?:og|twitter):image" content="\//.exec(html)
+    if (relative) {
+      console.log(`SHARE: FAIL (${page.name} still has a root-relative share image: ${relative[0]})`)
+      return false
+    }
+  }
+  console.log(`SHARE: OK ${size.width}x${size.height} ${buf.length} bytes, meta on / and /app/`)
+  return true
+}
+
+async function capture(): Promise<void> {
+  await runChecked(process.execPath, [join(WEB_DIR, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit'], { cwd: WEB_DIR })
+  await runChecked(process.execPath, [join(WEB_DIR, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'], { cwd: WEB_DIR })
+  const server = await serveDir(join(WEB_DIR, 'dist'))
+  const browser = await launchChrome(LAYOUT_WIDTH, LAYOUT_HEIGHT)
+  try {
+    await browser.page.goto(`${server.url}/`)
+    await browser.page.evaluate('document.fonts.ready.then(() => true)')
+    await new Promise((r) => setTimeout(r, SETTLE_MS))
+    const clip = { x: 0, y: 0, width: LAYOUT_WIDTH, height: LAYOUT_HEIGHT, scale: WIDTH / LAYOUT_WIDTH }
+    for (const quality of [86, 80, 74, 68, 62, 56, 50]) {
+      const shot = await browser.page.send<{ data: string }>('Page.captureScreenshot', { format: 'jpeg', quality, clip })
+      const buf = Buffer.from(shot.data, 'base64')
+      if (buf.length < MAX_BYTES) {
+        writeFileSync(OUT, buf)
+        console.log(`captured / at ${LAYOUT_WIDTH}x${LAYOUT_HEIGHT}, quality ${quality}`)
+        return
+      }
+    }
+    throw new Error('no quality down to 50 brought share.jpg under 300 KB')
+  } finally {
+    await browser.close()
+    await server.close()
+  }
+}
+
+async function main(): Promise<boolean> {
+  if (!process.argv.includes('--check')) await capture()
+  return check()
+}
+
+main()
+  .then((ok) => process.exit(ok ? 0 : 1))
+  .catch((error: unknown) => {
+    console.log(`SHARE: ERROR (${error instanceof Error ? error.message.split('\n')[0] : String(error)})`)
+    process.exit(2)
+  })
+```
+
+- [ ] **Step 3: Run it to confirm it fails on today's meta**
+Run: `pnpm -C web exec tsx scripts/share-image.ts --check`
+Expected: FAIL, exit code 1: `SHARE: FAIL (web/index.html lacks <meta property="og:url" content="https://anyorder.suitz.xyz/"> <meta property="og:image" content="https://anyorder.suitz.xyz/share.jpg"> <meta name="twitter:image" content="https://anyorder.suitz.xyz/share.jpg"> <link rel="canonical" href="https://anyorder.suitz.xyz/">)`
+
+- [ ] **Step 4: The landing page's head**
+In `web/index.html`:
+- directly after the line `<meta property="og:description" content="One clearing price per batch, computed by the contract, whatever order the transactions arrive in.">`, insert the line `<meta property="og:url" content="https://anyorder.suitz.xyz/">`;
+- replace the line `<meta property="og:image" content="/share.jpg">` with `<meta property="og:image" content="https://anyorder.suitz.xyz/share.jpg">`;
+- replace the line `<meta name="twitter:image" content="/share.jpg">` with `<meta name="twitter:image" content="https://anyorder.suitz.xyz/share.jpg">`;
+- replace the line `<!-- <link rel="canonical" href="https://the project's domain/"> once a domain exists -->` with `<link rel="canonical" href="https://anyorder.suitz.xyz/">`.
+
+- [ ] **Step 5: The app page's head**
+In `web/app/index.html`, replace the two lines
+```html
+<meta property="og:description" content="One clearing price per batch, computed by the contract, whatever order the transactions arrive in.">
+<meta name="twitter:card" content="summary_large_image">
+```
+with exactly
+```html
+<meta property="og:description" content="One clearing price per batch, computed by the contract, whatever order the transactions arrive in.">
+<meta property="og:url" content="https://anyorder.suitz.xyz/app/">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image" content="https://anyorder.suitz.xyz/share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AnyOrder landing page: a one-price batch exchange for Ethereum traders, beside a recorded cleared batch.">
+<meta name="twitter:image" content="https://anyorder.suitz.xyz/share.jpg">
+```
+and replace the line `<!-- <link rel="canonical" href="https://the project's domain/app/"> once a domain exists -->` with `<link rel="canonical" href="https://anyorder.suitz.xyz/app/">`.
+
+- [ ] **Step 6: Gate: both pages' share meta, then the skill's finish gate on /**
+`--check` verifies the committed image and both pages' meta and never recaptures. Fix every FAIL the skill's gate lists and run it again (three rounds at most). Then report the `GATE:` line, every waiver with its reason (none for `kit-edited`), and each section 5 checklist line of SKILL.md with the check ids that cover it. Measured by the architect with this exact code: `SHARE: OK 1200x630 84107 bytes, meta on / and /app/`, `GATE: PASS`, no waiver.
+Run: `pnpm -C web exec tsx scripts/share-image.ts --check && pnpm -C web ui-gate landing`
+Expected: PASS — `GATE: PASS`
+
+- [ ] **Step 7: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `feat(dapp): absolute share URLs and canonical links on anyorder.suitz.xyz`

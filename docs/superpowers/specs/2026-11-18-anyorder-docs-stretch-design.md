@@ -44,6 +44,12 @@ and says no public network is used; "Deploy" is the local one-command run, state
 spaces are supported, and that the taste gate is a local Step-2 acceptance check that needs the skill
 installed. `TBD-post-build:` lines are allowed only for the demo video URL and the public repo URL.
 
+**Live page** (added 2026-11-20, plan task docs:5, after dapp:14 and dapp:15): the README's Demo
+section, SUBMISSION.md's Demo section and the submission draft's Demo field each carry the one line
+`Live page: https://anyorder.suitz.xyz/ (the landing page; the app needs a local chain, see Quickstart)`
+and no other mention of the domain. The hosted site is a static landing page plus the recorded run;
+no document may call it a live market or say the app runs there.
+
 **Declaration** (both files): pre-existing work: none beyond the starter (`fe-lang/builders-challenge-starter`
 @ `f9d9aa9`, Apache-2.0: LICENSE, CI layout, SUBMISSION.md template; the vault example was not kept).
 Third-party code: the TestToken adapted from the Fe guide's ERC20 and the v26.6.0 `erc20.fe` fixture,
