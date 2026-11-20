@@ -8,9 +8,13 @@
  * quality in steps until the file is under 300 KB. Nothing is drawn or
  * generated: the pixels are the page's.
  *
+ * dapp:15: the check also proves both pages' share meta: og:image and
+ * twitter:image are absolute URLs on the real domain, og:url and the canonical
+ * link name each page's own URL, and no root-relative image URL is left.
+ *
  *   pnpm -C web exec tsx scripts/share-image.ts           capture, then check
  *   pnpm -C web exec tsx scripts/share-image.ts --check   check the committed image and meta only
- *   last line: SHARE: OK 1200x630 <bytes> bytes
+ *   last line: SHARE: OK 1200x630 <bytes> bytes, meta on / and /app/
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -45,15 +49,30 @@ function jpegSize(buf: Buffer): { width: number; height: number } | null {
   return null
 }
 
-const META = [
-  '<meta property="og:title" content="',
-  '<meta property="og:description" content="',
-  '<meta property="og:image" content="/share.jpg">',
-  '<meta property="og:image:width" content="1200">',
-  '<meta property="og:image:height" content="630">',
-  '<meta name="twitter:card" content="summary_large_image">',
-  '<meta name="twitter:image" content="/share.jpg">',
-]
+/** The domain the site is served on (Vercel, dapp:15). */
+const SITE = 'https://anyorder.suitz.xyz'
+
+/** Each page's file, its URL path and its own og:title. */
+const PAGES = [
+  { file: 'index.html', name: 'web/index.html', path: '/', title: 'AnyOrder: a batch-auction exchange for Ethereum traders' },
+  { file: join('app', 'index.html'), name: 'web/app/index.html', path: '/app/', title: 'AnyOrder: a batch exchange for Ethereum traders' },
+] as const
+
+/** The share lines each page must carry, exactly. */
+function metaFor(page: (typeof PAGES)[number]): string[] {
+  return [
+    `<meta property="og:title" content="${page.title}">`,
+    '<meta property="og:description" content="One clearing price per batch, computed by the contract, whatever order the transactions arrive in.">',
+    `<meta property="og:url" content="${SITE}${page.path}">`,
+    '<meta name="twitter:card" content="summary_large_image">',
+    `<meta property="og:image" content="${SITE}/share.jpg">`,
+    '<meta property="og:image:width" content="1200">',
+    '<meta property="og:image:height" content="630">',
+    '<meta property="og:image:alt" content="The AnyOrder landing page: a one-price batch exchange for Ethereum traders, beside a recorded cleared batch.">',
+    `<meta name="twitter:image" content="${SITE}/share.jpg">`,
+    `<link rel="canonical" href="${SITE}${page.path}">`,
+  ]
+}
 
 function check(): boolean {
   if (!existsSync(OUT)) {
@@ -70,13 +89,20 @@ function check(): boolean {
     console.log(`SHARE: FAIL (share.jpg is ${buf.length} bytes, want under ${MAX_BYTES})`)
     return false
   }
-  const html = readFileSync(join(WEB_DIR, 'index.html'), 'utf8')
-  const missing = META.filter((m) => !html.includes(m))
-  if (missing.length > 0) {
-    console.log(`SHARE: FAIL (web/index.html lacks ${missing.join(' ')})`)
-    return false
+  for (const page of PAGES) {
+    const html = readFileSync(join(WEB_DIR, page.file), 'utf8')
+    const missing = metaFor(page).filter((m) => !html.includes(m))
+    if (missing.length > 0) {
+      console.log(`SHARE: FAIL (${page.name} lacks ${missing.join(' ')})`)
+      return false
+    }
+    const relative = /<meta (?:property|name)="(?:og|twitter):image" content="\//.exec(html)
+    if (relative) {
+      console.log(`SHARE: FAIL (${page.name} still has a root-relative share image: ${relative[0]})`)
+      return false
+    }
   }
-  console.log(`SHARE: OK ${size.width}x${size.height} ${buf.length} bytes`)
+  console.log(`SHARE: OK ${size.width}x${size.height} ${buf.length} bytes, meta on / and /app/`)
   return true
 }
 
