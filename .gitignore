@@ -10,3 +10,9 @@ web/public/deployment.json
 web/.taste-skill/
 # Python
 __pycache__/
+# Local env files: never commit secrets
+.env
+.env.*
+!.env.example
+web/.env*
+!web/.env.example

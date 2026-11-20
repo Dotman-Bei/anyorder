@@ -61,7 +61,7 @@ $checks = [ordered]@{
   'permutation: 3 passed'        = $t -match 'test result: ok\. 3 passed; 0 failed'
   'grep hit on the profit assert' = $t -match '117:.*== 8_090_638_930_163_447'
   'every exit code 0'            = (([regex]::Matches($t, '### exit=(\d+)') | ForEach-Object { $_.Groups[1].Value }) -notmatch '^0$').Count -eq 0
-  'no username in the log'       = $t -notmatch '<user>'
+  'no username in the log'       = $t -notmatch [regex]::Escape($env:USERNAME)
   'clip written'                 = (Test-Path $mp4) -and ((Get-Item $mp4).Length -gt 100000)
 }
 $checks.GetEnumerator() | ForEach-Object { '{0} {1}' -f $(if ($_.Value) { 'ok ' } else { 'NOT' }), $_.Key }
