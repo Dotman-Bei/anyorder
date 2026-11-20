@@ -14,7 +14,10 @@ FRONTEND SOURCE OF TRUTH (verbatim from the kickoff):
   curves plot the contract's book (cumulative quantities); the price marker on them is the
   contract's `preview()` or the cleared `batchInfo` price, and is labelled as such.
 - **Labels.** Content not produced live by the contract (the recorded sandwich run on `/`) is
-  labelled "Recorded on a local Anvil chain, ⟨date⟩, commit ⟨sha⟩". Wherever traders appear:
+  labelled "Recorded on a local Anvil chain, ⟨date⟩, commit ⟨sha⟩". ⟨sha⟩ is a commit of the
+  current history: after the one history rewrite of 2026-11-20, plan task dapp:16 remaps every cited
+  SHA from the user's old-to-new map (path given only in `SHA_MAP`, never committed) and re-captures
+  `share.jpg` (amended 2026-11-20). Wherever traders appear:
   "Anvil dev accounts. Test funds, no real value."
 - **Unknown is never zero.** Any value not yet read renders `—` (`UNKNOWN` in `src/lib/format.ts`)
   with its state's text; a real zero renders as `0`.

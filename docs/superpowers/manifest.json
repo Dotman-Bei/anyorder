@@ -1372,6 +1372,50 @@
       "human_gate": false,
       "allow_empty": false,
       "status": "pending"
+    },
+    {
+      "id": "dapp:16",
+      "subsystem": "dapp",
+      "title": "Cite the post-rewrite commit SHAs everywhere, and re-capture the share image",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-dapp.md",
+      "depends_on": [
+        "docs:5"
+      ],
+      "effort": "medium",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "scripts/sha-remap.mjs",
+          "scripts/check-doc-schema.ps1"
+        ],
+        "modify": [
+          "README.md",
+          "web/public/recorded/sandwich.json",
+          "web/public/share.jpg",
+          "docs/tollgate/2026-11-17-tollgate.md",
+          "docs/guide/2026-11-17-fe-builders-challenge-runsheet.md",
+          "docs/demo/2026-11-19-demo-script.md"
+        ],
+        "test": []
+      },
+      "provides": [
+        "SHA_MAP=<map file> node scripts/sha-remap.mjs [--apply] -> last line SHA-REMAP: OK (0 old SHAs outside docs/gates/; ...)",
+        "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-doc-schema.ps1 -> last line DOC SCHEMA: OK"
+      ],
+      "requires": [
+        "web/public/recorded/sandwich.json (a real recorded run)",
+        "share meta on https://anyorder.suitz.xyz/ and /app/ (absolute og:image and twitter:image, og:url, canonical) + pnpm -C web exec tsx scripts/share-image.ts --check -> last line SHARE: OK 1200x630 <bytes> bytes, meta on / and /app/",
+        "pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)",
+        "README.md (R2-contract-protocol v1 + event-overlay)"
+      ],
+      "gate": {
+        "run": "node scripts/sha-remap.mjs && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-doc-schema.ps1 && pnpm -C web exec tsx scripts/share-image.ts --check && pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test && pnpm -C web ui-gate landing && pnpm -C web ui-gate app",
+        "expect": "GATE: PASS"
+      },
+      "commit": "fix(dapp): cite the post-rewrite commit SHAs; share image re-captured",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
     }
   ]
 }

@@ -377,7 +377,7 @@ Message: `docs: pitch wording that matches what the tests prove`
 **Requires:** nothing from other tasks
 
 - [ ] **Step 1: Context, and what may be claimed**
-Added 2026-11-20. The site is deployed on Vercel at https://anyorder.suitz.xyz/. What is true there, and all that the docs may say about it: `/` is a static landing page that shows the recorded run (baked in at build time, labelled "Recorded on a local Anvil chain, 2026-11-18, commit 48c0246"); `/app/` loads, and after Task dapp:14 its live sections say that the app needs a local Anvil chain and how to start it. **Nothing trades there:** no chain, no contracts, no live market, and the app does not run on the hosted site. This task depends on dapp:15 (and through it on dapp:14) so the line goes in only after both are green.
+Added 2026-11-20. The site is deployed on Vercel at https://anyorder.suitz.xyz/. What is true there, and all that the docs may say about it: `/` is a static landing page that shows the recorded run (baked in at build time, labelled "Recorded on a local Anvil chain, 2026-11-18, commit dedf5c5"); `/app/` loads, and after Task dapp:14 its live sections say that the app needs a local Anvil chain and how to start it. **Nothing trades there:** no chain, no contracts, no live market, and the app does not run on the hosted site. This task depends on dapp:15 (and through it on dapp:14) so the line goes in only after both are green.
 
 The line, exactly, the same in all three files:
 ```text

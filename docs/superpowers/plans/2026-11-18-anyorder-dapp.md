@@ -22,7 +22,7 @@ Conventions for every task in this plan:
   unlocked dev accounts.
 - Paths contain spaces on this machine ("VIBE CODE"): child processes take argument arrays, never a
   shell string.
-- UI tasks (5-12, 14, 15): read `~/.claude/skills/design-taste-frontend/SKILL.md` in full first, then
+- UI tasks (5-12, 14-16): read `~/.claude/skills/design-taste-frontend/SKILL.md` in full first, then
   `references/copy.md`, `copy-voice.md`, `system.md`, `layout-v4.md`, `sections.md`, `cards.md`,
   `motion.md`, `moments.md`, `effects-usage.md`, `gate.md`. Never invoke a Skill tool, never re-run a
   deal (the deal below is pinned), never edit a kit file, never add a waiver for `kit-edited`. You may
@@ -5334,3 +5334,227 @@ Expected: PASS — `GATE: PASS`
 The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
 those paths with this message. The executor never runs git.
 Message: `feat(dapp): absolute share URLs and canonical links on anyorder.suitz.xyz`
+
+---
+
+### Task 16: Cite the post-rewrite commit SHAs everywhere, and re-capture the share image
+
+**Files:**
+- Create: `scripts/sha-remap.mjs`
+- Create: `scripts/check-doc-schema.ps1`
+- Modify: `README.md`
+- Modify: `web/public/recorded/sandwich.json`
+- Modify: `web/public/share.jpg`
+- Modify: `docs/tollgate/2026-11-17-tollgate.md`
+- Modify: `docs/guide/2026-11-17-fe-builders-challenge-runsheet.md`
+- Modify: `docs/demo/2026-11-19-demo-script.md`
+
+**Depends on:** Task docs:5
+**Effort:** medium
+**Model tier:** top
+**Provides:** `SHA_MAP=<map file> node scripts/sha-remap.mjs [--apply] -> last line SHA-REMAP: OK (0 old SHAs outside docs/gates/; ...)`, `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-doc-schema.ps1 -> last line DOC SCHEMA: OK`
+**Requires:** `web/public/recorded/sandwich.json (a real recorded run)`, `share meta on https://anyorder.suitz.xyz/ and /app/ (absolute og:image and twitter:image, og:url, canonical) + pnpm -C web exec tsx scripts/share-image.ts --check -> last line SHARE: OK 1200x630 <bytes> bytes, meta on / and /app/`, `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)`, `README.md (R2-contract-protocol v1 + event-overlay)`
+
+- [ ] **Step 1: Read the skill first, then the context**
+This is a UI task: its gate ends on the skill's finish gate for `/` and `/app`. Read `~/.claude/skills/design-taste-frontend/SKILL.md` in full, then the references named in this plan's conventions, before you change anything. **Do not change either page's design:** no markup, no CSS, no copy. The only change the pages show is the recorded run's commit value, which comes from `web/public/recorded/sandwich.json`. Never edit a kit file, and never add a waiver for `kit-edited`.
+
+Context (added 2026-11-20):
+- **The rewrite:** on 2026-11-20 the history of `main` was rewritten once, with the user's consent, to remove a personal email from commit metadata. Every commit from before the rewrite got a new SHA (69 commits). The trees are the same, apart from the redaction.
+- **The map:** the user holds the old-to-new map, a text file **outside the repository** with one `<old 40-hex> <new 40-hex>` pair per line. Its path reaches you only through the environment variable **`SHA_MAP`**, set by the user or the orchestrator.
+- **If `SHA_MAP` is not set or not readable:** stop and return BLOCKED with `SHA_MAP is not set`. Never search the disk for the map.
+- **Never write anything from the map:** not its path, not any old SHA, in any file, report or message. `scripts/sha-remap.mjs` never prints either one; it prints only counts, file names and new SHAs.
+
+Where old SHAs are still cited. The architect counted them on 2026-11-20 with this task's script; every one is a 7-hex short SHA:
+- `README.md`: 1 (the recorded-run sentence)
+- `web/public/recorded/sandwich.json`: 1 (the `"commit"` field)
+- `docs/tollgate/2026-11-17-tollgate.md`: 18 (16 distinct)
+- `docs/guide/2026-11-17-fe-builders-challenge-runsheet.md`: 4
+- `docs/demo/2026-11-19-demo-script.md`: 1
+
+The architect already remapped the one in the docs plan. `docs/gates/` is the concierge's ledger and is **out of scope**: the script skips it, so never edit it.
+
+Where the commit shows on the pages:
+- `web/index.html` and `web/app/index.html` print `{{rec:commit}}` ("Recorded on a local Anvil chain, ⟨date⟩, commit ⟨sha⟩"), filled at build time from `sandwich.json`. `web/src/app/SandwichRunner.tsx` shows it at run time.
+- `web/public/share.jpg` is a still of the landing hero, so it carries the old value until it is re-captured with `scripts/share-image.ts`.
+- No unit test pins the value. The recording itself is unchanged: it ran on the same tree, so only the citation changes.
+
+The gate also runs the README and SUBMISSION heading-schema checks of docs plan Tasks 1 and 2, verbatim, through `scripts/check-doc-schema.ps1`. That script exits non-zero on FAIL, so this Git Bash gate can call it. The remap must not touch a heading.
+
+**Out of scope:** the published demo video may show the old short SHA on the landing hero. It is a rendered file and needs a re-render, which is not this task (tollgate Notes).
+
+- [ ] **Step 2: The remap and check script**
+Write `scripts/sha-remap.mjs` with exactly this content:
+```js
+#!/usr/bin/env node
+/**
+ * The one history rewrite (2026-11-20) changed every commit SHA. This script
+ * remaps cited SHAs from the old-to-new map and checks that none is left.
+ *
+ * The map is a text file outside the repository, one "<old 40-hex> <new 40-hex>"
+ * pair per line. Its path comes only from the SHA_MAP environment variable:
+ * neither the path nor any old SHA is ever written to a tracked file or printed.
+ *
+ *   SHA_MAP=<map file> node scripts/sha-remap.mjs --apply   rewrite old SHAs in tracked text files
+ *   SHA_MAP=<map file> node scripts/sha-remap.mjs           check; last line SHA-REMAP: OK (...)
+ *
+ * Scope: every tracked text file except docs/gates/ (the concierge's ledger).
+ * A cited SHA is a 7- to 40-hex token, lowercase, with no hex character on
+ * either side. It is old when it starts an old SHA of the map, and its
+ * replacement is the new SHA cut to the same length. The check fails on any old
+ * token, and on any cited new SHA that `git cat-file -e <sha>^{commit}` cannot
+ * resolve (missing or ambiguous).
+ */
+import { spawnSync } from 'node:child_process'
+import { readFileSync, writeFileSync } from 'node:fs'
+
+const EXCLUDED = ['docs/gates/']
+const TOKEN = /(?<![0-9A-Fa-f])[0-9a-f]{7,40}(?![0-9A-Fa-f])/g
+
+function fail(message) {
+  console.log(`SHA-REMAP: FAIL (${message})`)
+  process.exit(1)
+}
+
+function git(args) {
+  return spawnSync('git', args, { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 })
+}
+
+function readMap() {
+  const path = process.env.SHA_MAP
+  if (!path) fail('SHA_MAP is not set: point it at the old-to-new map file, which stays outside the repository')
+  let text
+  try {
+    text = readFileSync(path, 'utf8')
+  } catch {
+    fail('SHA_MAP does not name a readable file')
+  }
+  const pairs = []
+  for (const [i, line] of text.split(/\r?\n/).entries()) {
+    if (line.trim() === '') continue
+    const parts = line.trim().split(/\s+/)
+    if (parts.length !== 2 || !parts.every((p) => /^[0-9a-f]{40}$/.test(p))) fail(`map line ${i + 1} is not "<old 40-hex> <new 40-hex>"`)
+    pairs.push({ old: parts[0], new: parts[1] })
+  }
+  if (pairs.length === 0) fail('the map is empty')
+  return pairs
+}
+
+/** The map entry an old token starts, null when it starts none; ambiguous prefixes stop the run. */
+function oldEntry(pairs, token) {
+  const found = pairs.filter((p) => p.old.startsWith(token))
+  if (found.length > 1) fail(`a ${token.length}-hex token starts ${found.length} old SHAs; cite it longer`)
+  return found[0] ?? null
+}
+
+function trackedTextFiles() {
+  const out = git(['ls-files', '-z'])
+  if (out.status !== 0) fail('git ls-files failed: run from inside the repository')
+  return out.stdout
+    .toString('utf8')
+    .split('\0')
+    .filter((f) => f !== '' && !EXCLUDED.some((e) => f.startsWith(e)))
+    .flatMap((f) => {
+      let buf
+      try {
+        buf = readFileSync(f)
+      } catch {
+        return []
+      }
+      return buf.includes(0) ? [] : [{ file: f, text: buf.toString('utf8') }]
+    })
+}
+
+const pairs = readMap()
+const files = trackedTextFiles()
+
+if (process.argv.includes('--apply')) {
+  let total = 0
+  for (const { file, text } of files) {
+    let n = 0
+    const next = text.replace(TOKEN, (token) => {
+      const entry = oldEntry(pairs, token)
+      if (entry === null) return token
+      n += 1
+      return entry.new.slice(0, token.length)
+    })
+    if (n > 0) {
+      writeFileSync(file, next)
+      console.log(`remapped ${n} in ${file}`)
+      total += n
+    }
+  }
+  console.log(`SHA-REMAP: applied ${total} replacement(s); now run the check without --apply`)
+  process.exit(0)
+}
+
+let oldCount = 0
+const cited = new Map()
+for (const { file, text } of files) {
+  let n = 0
+  for (const [token] of text.matchAll(TOKEN)) {
+    if (oldEntry(pairs, token) !== null) n += 1
+    else if (pairs.some((p) => p.new.startsWith(token))) cited.set(token, [...(cited.get(token) ?? []), file])
+  }
+  if (n > 0) {
+    console.log(`OLD SHA: ${n} in ${file}`)
+    oldCount += n
+  }
+}
+const unresolved = [...cited.keys()].filter((sha) => git(['cat-file', '-e', `${sha}^{commit}`]).status !== 0)
+for (const sha of unresolved) console.log(`UNRESOLVED: ${sha} (cited in ${[...new Set(cited.get(sha))].join(', ')})`)
+const citing = new Set([...cited.values()].flat()).size
+if (oldCount > 0 || unresolved.length > 0) {
+  fail(`${oldCount} old SHA(s) outside docs/gates/, ${unresolved.length} cited new SHA(s) unresolved`)
+}
+console.log(`SHA-REMAP: OK (0 old SHAs outside docs/gates/; ${cited.size} cited new SHA(s) in ${citing} file(s) all resolve)`)
+```
+
+- [ ] **Step 3: Run the check to confirm it fails on today's text**
+Run: `node scripts/sha-remap.mjs`
+Expected: FAIL, exit code 1:
+- `OLD SHA: 1 in README.md`
+- `OLD SHA: 1 in docs/demo/2026-11-19-demo-script.md`
+- `OLD SHA: 4 in docs/guide/2026-11-17-fe-builders-challenge-runsheet.md`
+- `OLD SHA: 18 in docs/tollgate/2026-11-17-tollgate.md`
+- `OLD SHA: 1 in web/public/recorded/sandwich.json`
+- last line `SHA-REMAP: FAIL (25 old SHA(s) outside docs/gates/, 0 cited new SHA(s) unresolved)`
+
+With `SHA_MAP` unset, the last line is `SHA-REMAP: FAIL (SHA_MAP is not set: ...)`: return BLOCKED, as Step 1 says.
+
+- [ ] **Step 4: The doc-schema check**
+Write `scripts/check-doc-schema.ps1` with exactly this content:
+```powershell
+# The README and SUBMISSION heading schemas: the gate one-liners of docs plan Tasks 1 and 2,
+# verbatim, run in turn, with an exit code so a Git Bash gate can call this file.
+#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-doc-schema.ps1
+#   last line: DOC SCHEMA: OK
+$readme = & { $want = @('# AnyOrder','## Demo','## What it does','## Quickstart','## Built at Fe Builders Challenge 2026','## Contract addresses','## How it works','## Security notes','## Build & test','## Deploy','## The problem','## Approach','## Fe highlight','## Architecture','## Limitations','## Declaration','## Team','## Roadmap','## License'); $lines = Get-Content README.md -Encoding UTF8; $inFence = $false; $got = foreach ($l in $lines) { if ($l -match '^\x60{3}') { $inFence = -not $inFence } elseif (-not $inFence -and $l -cmatch '^#{1,2} ') { $l } }; $ok = ($got.Count -eq $want.Count); if ($ok) { for ($i = 0; $i -lt $want.Count; $i++) { if ($got[$i] -cne $want[$i]) { $ok = $false } } }; if ($ok -and ($lines[0] -ceq '<!-- readme-schema: R2-contract-protocol v1 + event-overlay -->')) { 'PASS' } else { 'FAIL' } }
+"README SCHEMA: $readme"
+$submission = & { $want = @('# AnyOrder','## The problem','## Approach','## Fe highlight','## Architecture','## Build and test','## Demo','## Limitations','## Declaration','## Team','## License'); $lines = Get-Content SUBMISSION.md -Encoding UTF8; $inFence = $false; $got = foreach ($l in $lines) { if ($l -match '^\x60{3}') { $inFence = -not $inFence } elseif (-not $inFence -and $l -cmatch '^#{1,2} ') { $l } }; $ok = ($got.Count -eq $want.Count); if ($ok) { for ($i = 0; $i -lt $want.Count; $i++) { if ($got[$i] -cne $want[$i]) { $ok = $false } } }; if ($ok -and (($lines -cmatch '^\*\*Pitch:\*\* ').Count -eq 1)) { 'PASS' } else { 'FAIL' } }
+"SUBMISSION SCHEMA: $submission"
+if ($readme -eq 'PASS' -and $submission -eq 'PASS') { 'DOC SCHEMA: OK'; exit 0 } else { 'DOC SCHEMA: FAIL'; exit 1 }
+```
+Run: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-doc-schema.ps1`
+Expected: `README SCHEMA: PASS`, `SUBMISSION SCHEMA: PASS`, last line `DOC SCHEMA: OK` (today's text already passes). Measured by the architect: renaming one README heading makes it print `README SCHEMA: FAIL` and `DOC SCHEMA: FAIL`, exit code 1.
+
+- [ ] **Step 5: Apply the remap**
+Run: `node scripts/sha-remap.mjs --apply`
+Expected: `remapped 1 in README.md`, `remapped 1 in docs/demo/2026-11-19-demo-script.md`, `remapped 4 in docs/guide/2026-11-17-fe-builders-challenge-runsheet.md`, `remapped 18 in docs/tollgate/2026-11-17-tollgate.md`, `remapped 1 in web/public/recorded/sandwich.json`, last line `SHA-REMAP: applied 25 replacement(s); now run the check without --apply`. If it remaps a file that is not in this task's `Files:`, put that file back as it was and return BLOCKED with its name.
+
+- [ ] **Step 6: Run the check again**
+Run: `node scripts/sha-remap.mjs`
+Expected: `SHA-REMAP: OK (0 old SHAs outside docs/gates/; 22 cited new SHA(s) in 6 file(s) all resolve)` (measured by the architect on the same text).
+
+- [ ] **Step 7: Re-capture the share image from the rebuilt landing page**
+Run: `pnpm -C web exec tsx scripts/share-image.ts`
+Expected: `captured / at 1440x756, quality 86`, then `SHARE: OK 1200x630 <bytes> bytes, meta on / and /app/` (the architect measured 84000 bytes). Then open `web/public/share.jpg` with your Read tool. The line under the hero's button must read "Recorded on a local Anvil chain, 2026-11-18, commit ⟨sha⟩", with the same 7 characters as the `"commit"` field of `web/public/recorded/sandwich.json`, and the hero must be fully drawn. If the hero's entrance had not finished, run the capture again.
+
+- [ ] **Step 8: Gate: SHAs, doc schemas, share image, types, unit tests, then the skill's finish gate on / and /app**
+Run: `node scripts/sha-remap.mjs && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-doc-schema.ps1 && pnpm -C web exec tsx scripts/share-image.ts --check && pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test && pnpm -C web ui-gate landing && pnpm -C web ui-gate app`
+Expected: PASS — `GATE: PASS`
+(`SHA_MAP` must be set in the gate's environment too: the orchestrator re-runs this line.)
+
+- [ ] **Step 9: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `fix(dapp): cite the post-rewrite commit SHAs; share image re-captured`
