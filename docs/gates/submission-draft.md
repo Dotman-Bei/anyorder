@@ -92,6 +92,7 @@ through a test-clock twin while the deployed contract reads the block timestamp.
   traders, no wallet extension needed).
 - **Video:** optional.
   - https://youtu.be/8QCVwiO_9c8 (unlisted; recorded and verified at Step 2.5)
+- Live page: https://anyorder.suitz.xyz/ (the landing page; the app needs a local chain, see Quickstart)
 
 ## Declaration ("A declaration of pre-existing work, reused code, and AI assistance")
 

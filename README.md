@@ -62,6 +62,8 @@ The landing page at `/` is built from a recorded run: "Recorded on a local Anvil
 
 Demo video: https://youtu.be/8QCVwiO_9c8
 
+Live page: https://anyorder.suitz.xyz/ (the landing page; the app needs a local chain, see Quickstart)
+
 ## What it does
 
 On a constant-product pool or any continuous exchange, a sandwich attacker buys just before your trade and sells just after it, because the order of transactions decides your price. AnyOrder collects orders for a fixed-length batch, then clears all of them at one uniform price computed by a pure function of the book. Arrival order is not an input, so front-running inside a batch has nothing to gain: every trader of the batch gets the same price, and the fills do not change when the same orders arrive in another order. The clearing rule maximises traded volume, then minimises the imbalance, then breaks the remaining tie by price. Funds are locked when an order is placed and credited by `claim`, so clearing never moves funds. The batch removes ordering, not market power: Limitations says exactly where the claim stops.
