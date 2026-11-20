@@ -98,8 +98,7 @@ through a test-clock twin while the deployed contract reads the block timestamp.
 
 - **Pre-existing work:** none of AnyOrder existed before 2026-11-03. The repository starts from
   `fe-lang/builders-challenge-starter` @ `f9d9aa9` (Apache-2.0): its LICENSE, CI layout and
-  SUBMISSION.md template; its vault example was not kept. Everything else was built 2026-11-17 to
-  2026-11-24.
+  SUBMISSION.md template; its vault example was not kept. Everything else was built from 2026-11-17 onward.
 - **Reused code (third party):** TestToken adapted from the Fe guide's ERC20 and argotorg/fe v26.6.0's
   `erc20.fe` fixture; the proxy-actor pattern from the v26.6.0 `ownable.fe`/`escrow.fe` fixtures; the
   pool's pricing after the guide's DEX `quote` example (all Apache-2.0). The design kit's runtime CSS/JS

@@ -29,7 +29,7 @@ submission code, the project ID, the contact email.
 origin; one branch (`main`), no tags, 60 commits. Visibility **PRIVATE**. LICENSE in the root, Apache
 License 2.0, and GitHub detects it as `apache-2.0`. CI and Native workflows are both **success** on
 `321ad90`. The manifest (`docs/superpowers/manifest.json`) has 32 tasks and **no** `human_gate`.
-The GitHub description still carries the old pitch ("…so sandwich attacks have nothing to exploit.").
+The GitHub description still carries the pre-docs:4 pitch sentence (the wording docs:4 replaced in the repo files).
 Open TBDs: README line 87 (`public-repo-url`), draft lines 30 (`repo-public-flip`), 32 (`commit-sha`),
 36 (`fe-version-confirmation`), 117 (`submission-form-receipt`), 119 (`automated-check-confirmation-email`).
 The demo-video URL is already resolved in the README (line 63), SUBMISSION and draft (line 94).

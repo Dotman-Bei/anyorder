@@ -84,7 +84,7 @@ pnpm -C web local                   # local Anvil + fe build + deploy + seed + V
 
 Starting point: "Rethink a protocol", with the "Make the math work" and "Build for the next builder" angles. Rethink a protocol: replace the continuous exchange's order-dependent pricing with a uniform-price batch. Make the math work: an exact clearing rule with a stated tie-break, rationing and rounding, checked against an exact-rational Python reference. Build for the next builder: the clearing rule is a separate ingot with no effects, reusable by another contract.
 
-Team: see [Team](#team). Built 2026-11-17 to 2026-11-24 from the contest starter (`fe-lang/builders-challenge-starter`).
+Team: see [Team](#team). Built from 2026-11-17, starting from the contest starter (`fe-lang/builders-challenge-starter`).
 
 Repository: TBD-post-build:public-repo-url (the repository is private until the public flip).
 
