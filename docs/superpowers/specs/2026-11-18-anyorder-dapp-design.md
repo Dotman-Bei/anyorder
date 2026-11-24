@@ -19,6 +19,12 @@ FRONTEND SOURCE OF TRUTH (verbatim from the kickoff):
   SHA from the user's old-to-new map (path given only in `SHA_MAP`, never committed) and re-captures
   `share.jpg` (amended 2026-11-20). Wherever traders appear:
   "Anvil dev accounts. Test funds, no real value."
+- **The closing footer on short wide screens** (amended 2026-11-24, plan task dapp:17). From 1280px
+  up the footer is at least one screen tall and grows where its content does not fit, as the kit
+  does from 640 to 1279, so the width-sized name never covers the footer links. The rule lives in
+  each page's own `<style>`, never in `web/public/assets/`. `scripts/layout-check.ts` checks 8 sizes
+  on / and /app/. Known cosmetic issue, not fixed: the hero's "-1 wei" note card covers some row
+  labels of the panel beside it at 1440x900 and 1536x730.
 - **Unknown is never zero.** Any value not yet read renders `—` (`UNKNOWN` in `src/lib/format.ts`)
   with its state's text; a real zero renders as `0`.
 - **Keys.** None. Writes are `eth_sendTransaction` from Anvil-unlocked dev addresses. The optional

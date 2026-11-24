@@ -22,7 +22,7 @@ Conventions for every task in this plan:
   unlocked dev accounts.
 - Paths contain spaces on this machine ("VIBE CODE"): child processes take argument arrays, never a
   shell string.
-- UI tasks (5-12, 14-16): read `~/.claude/skills/design-taste-frontend/SKILL.md` in full first, then
+- UI tasks (5-12, 14-17): read `~/.claude/skills/design-taste-frontend/SKILL.md` in full first, then
   `references/copy.md`, `copy-voice.md`, `system.md`, `layout-v4.md`, `sections.md`, `cards.md`,
   `motion.md`, `moments.md`, `effects-usage.md`, `gate.md`. Never invoke a Skill tool, never re-run a
   deal (the deal below is pinned), never edit a kit file, never add a waiver for `kit-edited`. You may
@@ -5558,3 +5558,219 @@ Expected: PASS — `GATE: PASS`
 The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
 those paths with this message. The executor never runs git.
 Message: `fix(dapp): cite the post-rewrite commit SHAs; share image re-captured`
+
+---
+
+### Task 17: The closing footer grows on short wide screens instead of painting the name over its links
+
+**Files:**
+- Modify: `web/index.html`
+- Modify: `web/app/index.html`
+- Create: `web/scripts/layout-check.ts`
+
+**Depends on:** Task 16, Task docs:6
+**Effort:** high
+**Model tier:** top
+**Provides:** `pnpm -C web exec tsx scripts/layout-check.ts -> last line LAYOUT: PASS (8 sizes, / and /app/: no footer overlap, no horizontal scroll)`
+**Requires:** `findChrome(), launchChrome(width, height): Promise<Browser>, serveDir(root): Promise<{ url, close }> (web/scripts/lib/chrome.ts)`, `pnpm -C web ui-gate app|landing (web/scripts/ui-gate.ts)`, `pnpm -C web ui-gate app --hosted (VERCEL=1 build into dist-hosted/, HOSTED: OK check in Chrome, then the skill's gate)`, `pnpm -C web exec tsx scripts/idle-check.ts -> last line IDLE: OK (30 s idle: live, no stale notice; RPC stopped: unavailable)`, `pnpm -C web exec tsx scripts/local-check.ts -> last line LOCAL: OK`, `share meta on https://anyorder.suitz.xyz/ and /app/ (absolute og:image and twitter:image, og:url, canonical) + pnpm -C web exec tsx scripts/share-image.ts --check -> last line SHARE: OK 1200x630 <bytes> bytes, meta on / and /app/`, `node scripts/check-readme.mjs -> last line README CHECK: PASS`
+
+- [ ] **Step 1: Read the skill first, then the context**
+This is a UI task. Read `~/.claude/skills/design-taste-frontend/SKILL.md` in full, then the references named in this plan's conventions, before you change anything. In particular, read `references/sections.md` and the section-height rules at the top of `web/public/assets/system.css`. The skill is the only source of truth for every visual decision. **Never edit `web/public/assets/*`**: those are the skill's runtime files, byte-identical to the kit, and the gate's `kit-edited` check fails on any change. Never add a waiver.
+
+The defect (2026-11-24, found by the guide on the live site with headless Chrome, and reproduced by the architect):
+- **Cause:** the kit's rule makes `footer.closing` exactly one screen tall (`height: calc(var(--h, 1) * 100svh)`, with its `.wrap` at `height: 100%` and rows `minmax(0, 1fr) auto`) from 1280px wide up. From 640 to 1279px the kit already lets it grow (`height: auto; min-height: 100svh`).
+- **Effect:** the giant name `.close__word` is sized by the width (`clamp(64px, 12.5vw, 180px)` on `/`, the kit's `clamp(64px, 14.5vw, 216px)` on `/app/`). So on a short window at 1280px or wider, the CTA row is squeezed and the name is painted over `.closing__links`: the footer logo, its lede, "Code" and "Source on GitHub".
+- **Measured on today's code** (`.close__word` bottom minus `.closing__links` top, on `/`): 1536x730 +59px, 1366x768 +7px, 1280x720 +39px, 1280x600 +159px. `/app/` has the same footer and overlaps at 1536x730, 1280x720 and 1280x600.
+
+The fix applies the kit's own 640-1279 rule from 1280 up, in each page's own `<style>` block. The footer becomes a column at least one screen tall (`min-height`), and its `.wrap` grows to fill it. Where the content fits (1920x1080, 1440x900) the footer stays exactly one screen, pixel for pixel. Where it doesn't, the footer grows. The name then sits a row gap (64px, `--s-8`) above the links at every size.
+
+**Out of scope, recorded in the tollgate:** in the hero, the floating "-1 wei" note card (`.hero__art > .ly-piece--note`) covers some row labels of the UI panel beside it at 1440x900 and 1536x730. Fixing it means re-placing a hero piece, a redesign beyond this task. The hero does not change, so `web/public/share.jpg` stays as it is.
+
+- [ ] **Step 2: The layout check**
+Write `web/scripts/layout-check.ts` with exactly this content:
+```ts
+/**
+ * dapp:17: the closing footer never paints the giant name over its links.
+ * Builds dist/, serves it on 127.0.0.1 and opens / and /app/ in the headless
+ * Chrome the other checks use (scripts/lib/chrome.ts), at each size below.
+ * Motion is reduced (prefers-reduced-motion) and the page is scrolled to the
+ * foot, so every box is measured where it comes to rest. On / it asserts:
+ *   - .close__word does not intersect .closing__links;
+ *   - no two visible text boxes inside footer.closing intersect;
+ *   - the footer is at least one screen tall, and exactly one screen at
+ *     1920x1080 and 1440x900, where its content fits;
+ *   - no horizontal scroll.
+ * On /app/: no two visible text boxes of its footer intersect, and no
+ * horizontal scroll.
+ *
+ *   pnpm -C web exec tsx scripts/layout-check.ts      last line: LAYOUT: PASS (...)
+ */
+import { join } from 'node:path'
+import { launchChrome, serveDir } from './lib/chrome'
+import { runChecked } from './lib/proc'
+import { WEB_DIR } from './lib/repo'
+
+const SIZES: ReadonlyArray<readonly [number, number]> = [
+  [1920, 1080],
+  [1536, 730],
+  [1440, 900],
+  [1366, 768],
+  [1280, 720],
+  [1280, 600],
+  [1100, 700],
+  [390, 844],
+]
+/** Sizes where the footer's content fits one screen, so the footer must stay exactly one screen. */
+const ONE_SCREEN = new Set(['1920x1080', '1440x900'])
+const SETTLE_MS = 900
+
+interface Measure {
+  innerWidth: number
+  innerHeight: number
+  scrollWidth: number
+  footerHeight: number | null
+  wordOverLinks: number | null
+  textOverlaps: string[]
+}
+
+/** Runs in the page: boxes of the closing footer, and every pair of its text boxes that intersect. */
+const MEASURE = `(() => {
+  const r = (el) => el.getBoundingClientRect()
+  const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1
+  const visible = (el) => {
+    for (let e = el; e; e = e.parentElement) {
+      const s = getComputedStyle(e)
+      if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false
+    }
+    return true
+  }
+  const footer = document.querySelector('footer.closing') || document.querySelector('footer')
+  const boxes = []
+  if (footer) {
+    const walk = document.createTreeWalker(footer, NodeFilter.SHOW_TEXT)
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (!n.textContent.trim() || !visible(n.parentElement)) continue
+      const range = document.createRange()
+      range.selectNodeContents(n)
+      for (const b of range.getClientRects()) {
+        if (b.width > 0 && b.height > 0) boxes.push({ text: n.textContent.trim().slice(0, 24), b })
+      }
+    }
+  }
+  const textOverlaps = []
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++)
+      if (boxes[i].text !== boxes[j].text && hit(boxes[i].b, boxes[j].b)) textOverlaps.push('"' + boxes[i].text + '" / "' + boxes[j].text + '"')
+  const word = document.querySelector('footer.closing .close__word')
+  const links = document.querySelector('footer.closing .closing__links')
+  return {
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    scrollWidth: document.documentElement.scrollWidth,
+    footerHeight: footer ? Math.round(r(footer).height) : null,
+    wordOverLinks: word && links ? Math.round(r(word).bottom - r(links).top) : null,
+    textOverlaps,
+  }
+})()`
+
+async function main(): Promise<boolean> {
+  await runChecked(process.execPath, [join(WEB_DIR, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'], { cwd: WEB_DIR })
+  const server = await serveDir(join(WEB_DIR, 'dist'))
+  const browser = await launchChrome(1920, 1080)
+  const problems: string[] = []
+  let checks = 0
+  try {
+    const page = browser.page
+    await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+    for (const [width, height] of SIZES) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 640 })
+      for (const path of ['/', '/app/']) {
+        await page.goto(`${server.url}${path}`)
+        await page.evaluate('document.fonts.ready.then(() => true)')
+        await page.evaluate('(window.scrollTo(0, document.documentElement.scrollHeight), true)')
+        await new Promise((r) => setTimeout(r, SETTLE_MS))
+        const m = await page.evaluate<Measure>(MEASURE)
+        const at = `${path} ${width}x${height}`
+        checks += 1
+        if (m.scrollWidth > m.innerWidth) problems.push(`${at}: horizontal scroll (${m.scrollWidth} > ${m.innerWidth})`)
+        for (const o of m.textOverlaps) problems.push(`${at}: footer text overlaps: ${o}`)
+        if (path === '/') {
+          if (m.wordOverLinks === null || m.footerHeight === null) problems.push(`${at}: no .close__word or .closing__links`)
+          else {
+            if (m.wordOverLinks > 0) problems.push(`${at}: .close__word overlaps .closing__links by ${m.wordOverLinks}px`)
+            if (width >= 640 && m.footerHeight < m.innerHeight - 1) problems.push(`${at}: footer ${m.footerHeight}px is shorter than one screen`)
+            if (ONE_SCREEN.has(`${width}x${height}`) && Math.abs(m.footerHeight - m.innerHeight) > 1) {
+              problems.push(`${at}: footer ${m.footerHeight}px, want exactly one screen (${m.innerHeight}px)`)
+            }
+          }
+          console.log(`layout: ${at} footer ${m.footerHeight}px, word-bottom minus links-top ${m.wordOverLinks}px`)
+        }
+      }
+    }
+  } finally {
+    await browser.close()
+    await server.close()
+  }
+  for (const p of problems) console.log(`FAIL ${p}`)
+  if (problems.length > 0) {
+    console.log(`LAYOUT: FAIL (${problems.length} problem(s) in ${checks} page loads)`)
+    return false
+  }
+  console.log(`LAYOUT: PASS (${SIZES.length} sizes, / and /app/: no footer overlap, no horizontal scroll)`)
+  return true
+}
+
+main()
+  .then((ok) => process.exit(ok ? 0 : 1))
+  .catch((error: unknown) => {
+    console.log(`LAYOUT: ERROR (${error instanceof Error ? error.message.split('\n')[0] : String(error)})`)
+    process.exit(2)
+  })
+```
+
+- [ ] **Step 3: Run it to confirm it fails on today's code**
+Run: `pnpm -C web exec tsx scripts/layout-check.ts`
+Expected: FAIL, exit code 1. Its `layout:` lines show `word-bottom minus links-top` of 59px at 1536x730, 7px at 1366x768, 39px at 1280x720 and 159px at 1280x600 (-64px at 1920x1080, 1440x900 and 1100x700; -48px at 390x844). Then:
+- `FAIL / <size>: .close__word overlaps .closing__links by <n>px` for those four sizes;
+- `FAIL ... footer text overlaps: "AnyOrder" / ...` lines on `/`, and on `/app/` at 1536x730, 1280x720 and 1280x600;
+- last line `LAYOUT: FAIL (20 problem(s) in 16 page loads)`.
+
+All measured by the architect.
+
+- [ ] **Step 4: The footer rule, in both pages' own CSS**
+In `web/index.html`, directly after the line
+```css
+@media (min-width: 640px) { .close__word { font-size: clamp(64px, 12.5vw, 180px); } }
+```
+insert exactly:
+```css
+/* dapp:17: the closing name is sized by the width, so on a short screen at 1280px and wider the footer
+   grows past one screen instead of painting the name over its links, as the kit already does from 640
+   to 1279. Where the content fits it stays exactly one screen. */
+@media (min-width: 1280px) {
+  footer.closing { display: flex; flex-direction: column; height: auto; min-height: calc(var(--h, 1) * 100vh); min-height: calc(var(--h, 1) * 100svh); }
+  footer.closing > .wrap { flex: 1 0 auto; height: auto; min-height: 0; }
+}
+```
+In `web/app/index.html`, insert the same block directly before the `</style>` that closes the page's second `<style>` block. That's the `</style>` straight after these two lines:
+```css
+  .contrast td::before { content: attr(data-label) ": "; color: var(--u-muted); }
+}
+```
+Change nothing else in either page.
+
+- [ ] **Step 5: Run the layout check on the fix**
+Run: `pnpm -C web exec tsx scripts/layout-check.ts`
+Expected:
+- footer heights on `/`: 1080 at 1920x1080, 853 at 1536x730, 900 at 1440x900, 839 at 1366x768, 823 at 1280x720 and at 1280x600, 789 at 1100x700, 844 at 390x844;
+- `word-bottom minus links-top` -64px at every size from 640 up, -48px at 390x844;
+- last line `LAYOUT: PASS (8 sizes, / and /app/: no footer overlap, no horizontal scroll)`.
+
+- [ ] **Step 6: Gate: types, unit tests, the layout, idle and local checks, the share image, the README, then the skill's gate on /, /app and hosted /app**
+Run: `pnpm -C web exec tsc --noEmit && NO_COLOR=1 pnpm -C web test && pnpm -C web exec tsx scripts/layout-check.ts && pnpm -C web exec tsx scripts/idle-check.ts && pnpm -C web exec tsx scripts/local-check.ts && pnpm -C web exec tsx scripts/share-image.ts --check && node scripts/check-readme.mjs && pnpm -C web ui-gate landing && pnpm -C web ui-gate app && pnpm -C web ui-gate app --hosted`
+Expected: PASS — `GATE: PASS`
+
+- [ ] **Step 7: Commit (kernel-performed — no agent runs this)**
+The orchestrator re-runs the gate, scope-checks the worktree against `Files:` and commits exactly
+those paths with this message. The executor never runs git.
+Message: `fix(dapp): the closing footer grows on short wide screens instead of covering its links`
