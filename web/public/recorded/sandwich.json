@@ -1,6 +1,6 @@
 {
   "recordedAt": "2026-11-18T05:50:57.885Z",
-  "commit": "48c0246",
+  "commit": "dedf5c5",
   "feVersion": "fe 26.6.0 (5b3f96a)",
   "chainId": 31337,
   "source": "pnpm -C web scenario on a local Anvil chain (osaka, tx gas cap on)",

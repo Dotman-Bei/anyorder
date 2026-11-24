@@ -1,0 +1,9 @@
+# The README and SUBMISSION heading schemas: the gate one-liners of docs plan Tasks 1 and 2,
+# verbatim, run in turn, with an exit code so a Git Bash gate can call this file.
+#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-doc-schema.ps1
+#   last line: DOC SCHEMA: OK
+$readme = & { $want = @('# AnyOrder','## Demo','## What it does','## Quickstart','## Built at Fe Builders Challenge 2026','## Contract addresses','## How it works','## Security notes','## Build & test','## Deploy','## The problem','## Approach','## Fe highlight','## Architecture','## Limitations','## Declaration','## Team','## Roadmap','## License'); $lines = Get-Content README.md -Encoding UTF8; $inFence = $false; $got = foreach ($l in $lines) { if ($l -match '^\x60{3}') { $inFence = -not $inFence } elseif (-not $inFence -and $l -cmatch '^#{1,2} ') { $l } }; $ok = ($got.Count -eq $want.Count); if ($ok) { for ($i = 0; $i -lt $want.Count; $i++) { if ($got[$i] -cne $want[$i]) { $ok = $false } } }; if ($ok -and ($lines[0] -ceq '<!-- readme-schema: R2-contract-protocol v1 + event-overlay -->')) { 'PASS' } else { 'FAIL' } }
+"README SCHEMA: $readme"
+$submission = & { $want = @('# AnyOrder','## The problem','## Approach','## Fe highlight','## Architecture','## Build and test','## Demo','## Limitations','## Declaration','## Team','## License'); $lines = Get-Content SUBMISSION.md -Encoding UTF8; $inFence = $false; $got = foreach ($l in $lines) { if ($l -match '^\x60{3}') { $inFence = -not $inFence } elseif (-not $inFence -and $l -cmatch '^#{1,2} ') { $l } }; $ok = ($got.Count -eq $want.Count); if ($ok) { for ($i = 0; $i -lt $want.Count; $i++) { if ($got[$i] -cne $want[$i]) { $ok = $false } } }; if ($ok -and (($lines -cmatch '^\*\*Pitch:\*\* ').Count -eq 1)) { 'PASS' } else { 'FAIL' } }
+"SUBMISSION SCHEMA: $submission"
+if ($readme -eq 'PASS' -and $submission -eq 'PASS') { 'DOC SCHEMA: OK'; exit 0 } else { 'DOC SCHEMA: FAIL'; exit 1 }

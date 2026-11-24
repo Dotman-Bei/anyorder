@@ -58,7 +58,7 @@ pnpm -C web install
 pnpm -C web local
 ```
 
-The landing page at `/` is built from a recorded run: "Recorded on a local Anvil chain, 2026-11-18, commit 48c0246" (`web/public/recorded/sandwich.json`, fe 26.6.0 (5b3f96a), chain id 31337). In the recording the pool sandwich nets the attacker 8090638930163447 wei and the victim 13773314203730272596 tokens instead of 14457831325301204819; the batch sandwich leaves the victim's fill and the price unchanged and the attacker at 0 tokens and -1 wei. `/app` reads the real contract live, and its "Run on your local chain" button repeats the scenario inside Anvil snapshots that are rolled back.
+The landing page at `/` is built from a recorded run: "Recorded on a local Anvil chain, 2026-11-18, commit dedf5c5" (`web/public/recorded/sandwich.json`, fe 26.6.0 (5b3f96a), chain id 31337). In the recording the pool sandwich nets the attacker 8090638930163447 wei and the victim 13773314203730272596 tokens instead of 14457831325301204819; the batch sandwich leaves the victim's fill and the price unchanged and the attacker at 0 tokens and -1 wei. `/app` reads the real contract live, and its "Run on your local chain" button repeats the scenario inside Anvil snapshots that are rolled back.
 
 Demo video: https://youtu.be/8QCVwiO_9c8
 

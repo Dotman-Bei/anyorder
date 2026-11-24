@@ -124,7 +124,7 @@ Notes for approval, kept inside this section because the schema allows no extra 
 | date | event | by |
 |---|---|---|
 | 2026-11-19 | scripted | demo-studio |
-| 2026-11-19 | approved (c722532, with three notes in section 5) | user |
+| 2026-11-19 | approved (7014611, with three notes in section 5) | user |
 | 2026-11-19 | superseded-edit (S3: the grep pattern is `== 8_090_638_930_163_447` so the single hit is the profit assertion, line 117; the terminal runs in a clean clone `C:nyorder-demo` instead of a subst drive; S6's live capture is about 36 s, so audio-first timing and trims apply) | demo-studio |
 | 2026-11-19 | pre-flight verified | demo-studio |
 | 2026-11-19 | recorded (8/8 scenes; S5 retaken once because the pointer covered a figure) | demo-studio |
