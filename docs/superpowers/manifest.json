@@ -1416,6 +1416,43 @@
       "human_gate": false,
       "allow_empty": false,
       "status": "pending"
+    },
+    {
+      "id": "docs:6",
+      "subsystem": "docs",
+      "title": "README in the layout of the user's Ambit README",
+      "plan": "docs/superpowers/plans/2026-11-18-anyorder-docs.md",
+      "depends_on": [
+        "docs:5",
+        "dapp:16"
+      ],
+      "effort": "high",
+      "model_tier": "top",
+      "files": {
+        "create": [
+          "scripts/check-readme.mjs"
+        ],
+        "modify": [
+          "README.md"
+        ],
+        "test": []
+      },
+      "provides": [
+        "README.md (Ambit layout over R2-contract-protocol v1 + event-overlay)",
+        "node scripts/check-readme.mjs -> last line README CHECK: PASS"
+      ],
+      "requires": [
+        "README.md (R2-contract-protocol v1 + event-overlay)",
+        "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-doc-schema.ps1 -> last line DOC SCHEMA: OK"
+      ],
+      "gate": {
+        "run": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-doc-schema.ps1 && bash scripts/check-gas-story.sh && node scripts/check-readme.mjs",
+        "expect": "README CHECK: PASS"
+      },
+      "commit": "docs: README in the Ambit layout, every locked heading kept",
+      "human_gate": false,
+      "allow_empty": false,
+      "status": "pending"
     }
   ]
 }

@@ -50,6 +50,16 @@ section, SUBMISSION.md's Demo section and the submission draft's Demo field each
 and no other mention of the domain. The hosted site is a static landing page plus the recorded run;
 no document may call it a live market or say the app runs there.
 
+**Ambit layout** (added 2026-11-24, plan task docs:6, the user's request): the README follows the
+structure of the user's Ambit README while keeping every locked `#`/`##` heading of the schema
+above. Ambit's blocks sit above `## Demo` (centered title, bold pitch tagline, static shields.io
+badges, link row, Stage blockquote, a bold Contents line) or as `###` blocks under the matching
+locked heading. Two rules above change for the README only: the pitch is the bold tagline two lines
+under `# AnyOrder` instead of README line 4, and the README may name the live domain outside the
+live-page line (the link row, the explore table); the live-page line itself stays single and in the
+Demo section. SUBMISSION.md and the submission draft keep the docs:5 rule. `scripts/check-readme.mjs`
+checks all of it, plus no `TBD-post-build`, every relative link and anchor, and every cited command.
+
 **Declaration** (both files): pre-existing work: none beyond the starter (`fe-lang/builders-challenge-starter`
 @ `f9d9aa9`, Apache-2.0: LICENSE, CI layout, SUBMISSION.md template; the vault example was not kept).
 Third-party code: the TestToken adapted from the Fe guide's ERC20 and the v26.6.0 `erc20.fe` fixture,
