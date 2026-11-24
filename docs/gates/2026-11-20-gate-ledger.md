@@ -76,8 +76,9 @@ the deadline.
 | # | Gate | Tier | Pass | Tool plan (exact) | Human moment | Risk note | Status |
 |---|---|---|---|---|---|---|---|
 | G1 | **(a) Pre-flip privacy and secrets scan** of the working tree, all 60 commits on every ref, and commit metadata | A, read-only | closing | `Bash`: `git grep -nIE` over HEAD, then `git log --all -p` piped through `grep -nE`, for: email patterns (and the user's own address, matched in-process, never printed), `gho_`/`ghp_`/`github_pat_`, `sk-`/`AKIA`/`-----BEGIN`, 64-hex private-key shapes (Anvil dev keys are public and expected, so they are listed separately), 12/24-word mnemonics, the Google Forms prefill/`entry.` pattern, `C:\Users\<name>` and `/c/Users/<name>` paths, `AppData`, `.env` files; `git log --all --format='%an %ae %cn %ce'` for author emails; review of the tracked `.claude/agents/*.md` (5 files) and every file ever deleted (`git log --all --diff-filter=D --name-only`); `git check-ignore` for `.claude/settings.local.json`, `web/.taste-skill/` (a local Chrome profile, already ignored and untracked) | Decide on each finding. I report it with the least destructive fix (a forward commit that redacts the working tree; history rewrites are offered only as an option that needs your separate consent) | None: read-only. If a finding needs a product or doc fix, I stop and route it to the architect | **done 2026-11-20**: 3 findings (F1–F3). **Fixed 2026-11-20:** F2 and F3 as forward commits (now `12a7a1a`, and `d076cc8` for the wording fix); F1 and F2 in history by the one consented rewrite plus force-push (new tip `d076cc8`). Delta scan of the 7 commits after `caba6e3`: clean apart from F1. **New pre-G3 blockers R1–R2** in the evidence log |
-| G1-R | **History rewrite and force-push** (the user's separate, explicit consent for exactly one rewrite and one force-push of `main`, private repo) | A, consented | closing | `git bundle` backup outside the repo; `git filter-branch --env-filter` (identity) `--index-filter` (swaps in 20 pre-built redacted blobs, written with `hash-object --no-filters`) `-- main`; `git push --force-with-lease=main:ba44561…` with the gh credential helper; `git config` user.name/email set to the noreply identity before any commit | none | Old commits are still served by SHA on GitHub (R1); the docs cite old SHAs (R2) | **done 2026-11-20**, evidence below |
-| G2 | **(b) Set the GitHub description** to the new pitch | A | closing | `Bash`: `gh repo edit Dotman-Bei/anyorder --description "A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit."`, verify with `gh repo view --json description` | none | Reversible metadata; no commit | **done 2026-11-20**: read back, equal to the new pitch; visibility still PRIVATE |
+| G1-R | **History rewrite and force-push** (the user's separate, explicit consent for exactly one rewrite and one force-push of `main`, private repo) | A, consented | closing | `git bundle` backup outside the repo; `git filter-branch --env-filter` (identity) `--index-filter` (swaps in 20 pre-built redacted blobs, written with `hash-object --no-filters`) `-- main`; `git push --force-with-lease=main:ba44561…` with the gh credential helper; `git config` user.name/email set to the noreply identity before any commit | none | Old commits are still served by SHA on GitHub (R1); the docs cite old SHAs (R2) | **done 2026-11-20**, evidence below. R1 closed by G1-RC, R2 by dapp:16 |
+| G1-RC | **Recreate the repo** (R1 fix: the user's explicit consent, given once on 2026-11-24, to delete the PRIVATE repo and recreate it PRIVATE under the same name, so GitHub stops serving the pre-rewrite objects) | A, consented | closing | `git bundle` of all refs, verified and test-cloned; settings snapshot (`gh api` repo, actions, secrets, variables, environments, pages, hooks, keys, collaborators); `gh auth refresh -s delete_repo` (the user authorized the device code in Chrome); `gh repo delete --yes`; `gh repo create --private --description --homepage`; `gh repo edit` for features and merge options; `git push -u origin main` with the gh credential helper | The user: the device-code authorization, then the Vercel reconnect | Irreversible delete, protected by the verified bundle; CI run history lost; Vercel had to be reconnected | **done 2026-11-24** except the Vercel push check; evidence below |
+| G2 | **(b) Set the GitHub description** to the new pitch | A | closing | `Bash`: `gh repo edit Dotman-Bei/anyorder --description "A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit."`, verify with `gh repo view --json description` | none | Reversible metadata; no commit | **done 2026-11-20**: read back, equal to the new pitch; visibility still PRIVATE. **Re-done 2026-11-24** on the recreated repo (set by `gh repo create --description`, read back exactly) |
 | G3 | **(c) Flip the repo public** | A, with your consent | closing | Preconditions re-checked right before the flip: G1 clean or resolved, `gh auth status` = `Dotman-Bei`, LICENSE root Apache-2.0 (`gh repo view --json licenseInfo`), CI green on HEAD (`gh run list`), README renders (`gh api -H "Accept: application/vnd.github.html" repos/Dotman-Bei/anyorder/readme`). Then `gh repo edit Dotman-Bei/anyorder --visibility public --accept-visibility-change-consequences`; verify anonymously (`curl -sI https://github.com/Dotman-Bei/anyorder` → 200 with no auth) and view the page in Chrome (`claude-in-chrome`, new tab) | Your consent is the moment | **Effectively irreversible.** Once public, forks, caches and indexers may keep copies even if the repo is made private again, so G1 must be clean first. Stars and watchers are lost if it is flipped back | pending |
 | G4 | **(d) Clean-room test** of the public repo, following only the README | A | closing | `Bash`: `git -c credential.helper= clone https://github.com/Dotman-Bei/anyorder` (no credentials, which proves the clone is anonymous) into scratchpad folder `cleanroom-nospace\` and then into `clean room\` (a path with a space); in each: `fe test`, `fe test --filter sandwich`, `pnpm -C web install`, `pnpm -C web local` (background), `curl` `/` and `/app/` expecting 200, then stop it and confirm no Anvil or Vite process is left. Every deviation from the README's words is recorded. The user's own servers on 8545/5173 are untouched (`local` moves ports when they are busy) | none | Local only. A defect means I stop and send you a fix hint (no product edits by me). Precondition: G3 (the repo must be public) | pending |
 | G5 | **(e) Resolve the TBD-post-build fields and freeze the SHA** | A | closing | `Edit`: README line 87 → `Repository: https://github.com/Dotman-Bei/anyorder`; draft line 30 → repo public (date, G3 evidence); line 32 → per D1; line 36 → `fe --version` re-run on HEAD; this ledger's evidence for G1–G5. One commit, pushed with the gh credential helper; wait for CI and Native to succeed on it; record the full 40-hex SHA. `git diff <G4-tested SHA>..HEAD --stat` must show only those docs | Approve D1 | This commit becomes the judged SHA. If CI fails on it, nothing is submitted. If a later fix is needed after the freeze, the freeze is redone (latest valid submission counts) | pending |
@@ -202,3 +203,51 @@ forward commit then history scrub; F3: ignore env files) came in the chat on 202
   7-hex token found in the old→new map (the concierge holds it in its scratchpad as
   `sha-map-full.txt`, 69 pairs) and regenerate `share.jpg` with `share-image.ts`. Then G1 delta,
   CI and Vercel again.
+
+### Delta scan, recreate (G1-RC), G2 re-done: 2026-11-24
+
+- **R2 closed by dapp:16** (`f13e785`, tollgate note `3b292bd`). The docs cite post-rewrite SHAs and
+  `share.jpg` was re-captured ("commit dedf5c5"). The only pre-rewrite SHAs left are in this
+  ledger's 2026-11-20 entries, labelled "pre"; after the recreate they no longer resolve.
+- **G1 delta scan** of the 3 commits after `3dc79d1` (`757dbe7`, `f13e785`, `3b292bd`): all 3
+  carry the noreply identity; 0 username or email added, 0 token or key shapes, 0 form links, 0 env
+  files; the 2 absolute paths are `C:\Users\<user>`; one binary (`web/public/share.jpg`, checked
+  visually: it shows commit dedf5c5 and nothing personal). Username in the whole HEAD tree: 0.
+  Gmail identities in all history: 0.
+- **Safety before delete:** local `main` = `origin/main` = `3b292bd3149e460ac40773a76e6b0fbb3475cf1a`,
+  clean tree. Refs on origin: `refs/heads/main` (and `HEAD`) only. Bundle of all refs
+  (`anyorder-pre-recreate-3b292bd.bundle`, 3.4 MB, 73 commits, in the concierge's session
+  scratchpad, never committed): `git bundle verify` okay; a test clone from it restored `3b292bd`
+  with tree `3892a22`, identical. Settings snapshot: the description (the new pitch), homepage
+  `https://anyorder.suitz.xyz`, default branch `main`, no topics, Issues and Projects on, Wiki and
+  Discussions off, squash, merge and rebase allowed, auto-merge off, Actions enabled (all actions,
+  default workflow permissions `read`), no Pages, 0 secrets, variables, environments, webhooks or
+  deploy keys; rulesets aren't available on a free private repo; no issues, PRs, releases, stars or
+  forks; collaborators: the owner only.
+- **Delete scope:** `gh auth refresh -h github.com -s delete_repo` (device flow; the user authorized
+  it in Chrome and confirmed in chat) → scopes `delete_repo, gist, read:org, repo, workflow`.
+- **Recreate (18:54–18:55 UTC):** re-checked first (bundle okay, remote tip `3b292bd`, clean tree);
+  `gh repo delete Dotman-Bei/anyorder --yes` → `gh api` 404; `gh repo create … --private
+  --description <pitch> --homepage https://anyorder.suitz.xyz`; `gh repo edit` restores the
+  features and merge options (read back, all equal to the snapshot); `git push -u origin main`.
+- **Verification:**
+  - GitHub tip = local tip = `3b292bd3149e460ac40773a76e6b0fbb3475cf1a`; default branch `main`;
+    visibility private; license `LICENSE`, key `apache-2.0`; Actions enabled, all allowed, `read`.
+  - `git log --all --format='%an %ae %cn %ce'` →
+    `73 Dotman-Bei 140025488+Dotman-Bei@users.noreply.github.com Dotman-Bei 140025488+Dotman-Bei@users.noreply.github.com`.
+  - The pre-rewrite objects are gone:
+    `gh api repos/Dotman-Bei/anyorder/git/commits/48c0246e4ae49c2f641537850921a396e36efa8b` → HTTP
+    404. `commits/<sha>` → HTTP 422 "No commit found for SHA" (the endpoint's answer for an
+    unknown SHA; before the recreate it returned the old commit with the Gmail author). The same
+    for `321ad90`, `caba6e3`, `b05cba4`, `ba44561`. The post-rewrite `dedf5c5` resolves with the
+    noreply author.
+  - CI and Native workflows on the new repo: both `success` on `3b292bd`; check-runs
+    `clearing-native=success, fe=success, web=success` (the same set as before).
+  - **Vercel:** the user reconnected the project to the recreated repo (Settings → Git). By 19:05
+    UTC there was no Vercel status or deployment on `3b292bd` in the new repo. The live site
+    answered 200 on `/`, `/app/`, `/share.jpg` (absolute `og:image` and canonical, "commit
+    dedf5c5") but was a cache hit with `Last-Modified 18:45:02 GMT`, from before the delete. The
+    user's dashboard screenshot shows the newest Production deployment, `3b292bd` Ready, built
+    "38m ago", also before the delete. **The reconnect is tested by the push of this ledger
+    commit:** its Vercel status goes in the next ledger update.
+- **G2 re-done** on the recreated repo: the description is the new pitch exactly; homepage restored.
