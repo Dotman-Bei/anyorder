@@ -269,6 +269,13 @@
   .contrast :is(th, td), .contrast :is(th, td):first-child, .contrast :is(th, td):last-child { display: block; padding: 0; border: 0; }
   .contrast td::before { content: attr(data-label) ": "; color: var(--u-muted); }
 }
+/* dapp:17: the closing name is sized by the width, so on a short screen at 1280px and wider the footer
+   grows past one screen instead of painting the name over its links, as the kit already does from 640
+   to 1279. Where the content fits it stays exactly one screen. */
+@media (min-width: 1280px) {
+  footer.closing { display: flex; flex-direction: column; height: auto; min-height: calc(var(--h, 1) * 100vh); min-height: calc(var(--h, 1) * 100svh); }
+  footer.closing > .wrap { flex: 1 0 auto; height: auto; min-height: 0; }
+}
 </style>
 <script>document.documentElement.classList.add('m-enter');setTimeout(()=>document.documentElement.classList.add('m-enter-done'),700)</script>
 <script src="/assets/backgrounds/backgrounds.js"></script>

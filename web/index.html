@@ -80,6 +80,13 @@
 @media (max-width: 639px) { .aw__body { grid-template-columns: minmax(0, 1fr); } .aw__side { display: none; } }
 .close__word { line-height: 1.2; }
 @media (min-width: 640px) { .close__word { font-size: clamp(64px, 12.5vw, 180px); } }
+/* dapp:17: the closing name is sized by the width, so on a short screen at 1280px and wider the footer
+   grows past one screen instead of painting the name over its links, as the kit already does from 640
+   to 1279. Where the content fits it stays exactly one screen. */
+@media (min-width: 1280px) {
+  footer.closing { display: flex; flex-direction: column; height: auto; min-height: calc(var(--h, 1) * 100vh); min-height: calc(var(--h, 1) * 100svh); }
+  footer.closing > .wrap { flex: 1 0 auto; height: auto; min-height: 0; }
+}
 /* #how: one small UI panel on each card's lit panel, whole, 32px down */
 #how .panel { --p-h: 264px; }
 #how .stage > .at-rise { --ax: 24px; --ay: 32px; }
