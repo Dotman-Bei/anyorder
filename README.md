@@ -1,13 +1,48 @@
 <!-- readme-schema: R2-contract-protocol v1 + event-overlay -->
+<div align="center">
+
 # AnyOrder
 
-A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit.
+**A uniform-price batch-auction exchange in Fe whose fills are independent of transaction order, so a sandwich has no ordering to exploit.**
 
-Unaudited prototype for a local Anvil chain. Fe 26.6.0, EVM backend, EVM revision Osaka.
+![Fe 26.6.0](https://img.shields.io/badge/Fe-26.6.0-1b4d99?style=flat-square)
+![fe test: 57 passed](https://img.shields.io/badge/fe%20test-57%20passed-17753b?style=flat-square)
+![web tests: 41 passed](https://img.shields.io/badge/web%20tests-41%20passed-17753b?style=flat-square)
+![chain: local Anvil, Osaka](https://img.shields.io/badge/chain-local%20Anvil%20%C2%B7%20Osaka-8f5c00?style=flat-square)
+![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-555555?style=flat-square)
+
+[Demo video](https://youtu.be/8QCVwiO_9c8) · [Live page](https://anyorder.suitz.xyz/) · [The contest](https://fe-lang.org/contest/) · [Verify it yourself](#verify-it-yourself) · [Run locally](#run-locally)
+
+</div>
+
+On a continuous exchange the order of transactions sets your price, and whoever controls that order can sandwich you. AnyOrder takes the order away. Orders collect for a fixed-length batch; then one pure function of the book picks a single price for everyone in it. Going first is worth nothing.
+
+> **Stage: hackathon build, local chain only.** It runs on a local Anvil chain (chain id 31337, Osaka rules) and nothing's deployed to any testnet or mainnet. The order book the app shows is seeded by the setup script, not by real traders. It's an unaudited prototype, built on Fe 26.6.0, a compiler that isn't production-ready yet. Nothing below is claimed past what the tests and `fe test` show.
+
+**Contents**
+
+- [Demo](#demo) · [Explore without a wallet](#explore-without-a-wallet)
+- [What it does](#what-it-does)
+- [Quickstart](#quickstart) · [Verify it yourself](#verify-it-yourself) · [Run locally](#run-locally)
+- [Built at Fe Builders Challenge 2026](#built-at-fe-builders-challenge-2026) · [Contract addresses](#contract-addresses)
+- [How it works](#how-it-works) · [The mechanism, step by step](#the-mechanism-step-by-step)
+- [Security notes](#security-notes) · [Trust boundaries](#trust-boundaries) · [Gas](#gas)
+- [Build & test](#build--test) · [Evidence](#evidence) · [How this could be misleading](#how-this-could-be-misleading)
+- [Deploy](#deploy)
+- [The problem](#the-problem) · [Why this exists](#why-this-exists)
+- [Approach](#approach) · [Fe highlight](#fe-highlight)
+- [Architecture](#architecture) · [Repository map](#repository-map)
+- [Limitations](#limitations) · [What is real and what is not](#what-is-real-and-what-is-not)
+- [Declaration](#declaration) · [Attribution and further reading](#attribution-and-further-reading)
+- [Team](#team) · [Roadmap](#roadmap) · [License](#license)
 
 ## Demo
 
-The money shot is two commands. Both run the real compiler against the real contracts.
+[![AnyOrder demo video: the pool sandwich against the batch, on a local Anvil chain](https://img.youtube.com/vi/8QCVwiO_9c8/maxresdefault.jpg)](https://youtu.be/8QCVwiO_9c8)
+
+**[Watch the demo video](https://youtu.be/8QCVwiO_9c8).** The landing page, the evidence on the real compiler, the same sandwich run in the app against the real contracts, and a full batch from order to claim.
+
+The money shot is one command. It runs the real compiler against the real contracts:
 
 ```sh
 fe test --filter sandwich
@@ -23,6 +58,8 @@ PASS  exchange sandwich_batch_attacker_nets_dust
 
 test result: ok. 6 passed; 0 failed
 ```
+
+And the claim that order doesn't matter, on its own:
 
 ```sh
 fe test --filter permutation
@@ -49,7 +86,7 @@ What the numbers say. Pool: 400 TKN / 4.4 ETH, no fee. Batch background: sells o
 | One-sided buy of 10 TKN at 0.026 | price 0.011 becomes **0.012**; victim pays 0.18; attacker pays 0.12 at that price and holds 10 TKN |
 | In-range wash pair (property test) | book buy 5@7, sell 5@2 clears at 7; with buy 1@6 + sell 1@5 it clears at **6**; the pair nets 0 tokens, at most 0 wei |
 
-The last two rows are the limits of the claim, not the headline; see [Limitations](#limitations).
+The last two rows are where the claim stops, not the headline; see [How this could be misleading](#how-this-could-be-misleading) and [Limitations](#limitations).
 
 Run it yourself in the browser against a local chain with one command (the dApp opens at `/`; the app is at `/app`):
 
@@ -64,9 +101,21 @@ Demo video: https://youtu.be/8QCVwiO_9c8
 
 Live page: https://anyorder.suitz.xyz/ (the landing page; the app needs a local chain, see Quickstart)
 
+### Explore without a wallet
+
+Nothing here asks for a wallet or an account. The hosted site can't reach a chain, so its live panels say how to run the app locally instead of pretending.
+
+| Where | What you see | Needs a wallet |
+|---|---|---|
+| [`/`](https://anyorder.suitz.xyz/) | The landing page, built from the recorded run and labelled "Recorded on a local Anvil chain" | No |
+| [`/app/`](https://anyorder.suitz.xyz/app/) | The hosted app: its static and recorded panels, and in place of each live panel a notice that it needs a local Anvil chain, with the two commands | No |
+| [Demo video](https://youtu.be/8QCVwiO_9c8) | The app running against the real contracts on a local chain | No |
+| `fe test` | The whole evidence suite on the real compiler: 57 tests | No |
+| `pnpm -C web local` | The full app on your own local chain; the built-in traders are Anvil dev accounts with test funds | No |
+
 ## What it does
 
-On a constant-product pool or any continuous exchange, a sandwich attacker buys just before your trade and sells just after it, because the order of transactions decides your price. AnyOrder collects orders for a fixed-length batch, then clears all of them at one uniform price computed by a pure function of the book. Arrival order is not an input, so front-running inside a batch has nothing to gain: every trader of the batch gets the same price, and the fills do not change when the same orders arrive in another order. The clearing rule maximises traded volume, then minimises the imbalance, then breaks the remaining tie by price. Funds are locked when an order is placed and credited by `claim`, so clearing never moves funds. The batch removes ordering, not market power: Limitations says exactly where the claim stops.
+On a constant-product pool or any continuous exchange, a sandwich attacker buys just before your trade and sells just after it, because the order of transactions decides your price. AnyOrder collects orders for a fixed-length batch, then clears all of them at one uniform price computed by a pure function of the book. Arrival order isn't an input, so front-running inside a batch has nothing to gain: every trader of the batch gets the same price, and the fills don't change when the same orders arrive in another order. The clearing rule maximises traded volume, then minimises the imbalance, then breaks the remaining tie by price. Funds are locked when an order is placed and credited by `claim`, so clearing never moves funds. The batch removes ordering, not market power; [Limitations](#limitations) says exactly where the claim stops.
 
 ## Quickstart
 
@@ -79,6 +128,29 @@ pnpm -C web local                   # local Anvil + fe build + deploy + seed + V
 ```
 
 `pnpm -C web local` starts Anvil on port 8545, builds with `fe build`, deploys, funds the built-in traders, seeds one cleared batch and one open batch, writes `web/public/deployment.json` and starts the dev server. Open `/` for the landing page and `/app` for the exchange.
+
+### Verify it yourself
+
+From a clean clone, in the order a judge would run them. No wallet, key or account is needed.
+
+```sh
+git clone https://github.com/Dotman-Bei/anyorder && cd anyorder
+fe --version                                 # fe 26.6.0 (5b3f96a)
+fe test --filter sandwich                    # the headline: 6 passed
+fe test --filter permutation                 # order doesn't change price or fills: 3 passed
+fe test                                      # the whole suite: 57 passed
+python ref/clearing_ref.py --check           # the generated vectors are up to date
+python ref/clearing_ref.py --selftest        # 20,000 random books: rule = oracle, lemmas, condition C
+bash scripts/check-abi.sh                    # the deployed contracts' ABIs match abi/
+bash scripts/mutant-reentrancy.sh            # the reentrancy test fails once the lock is deleted
+pnpm -C web install
+pnpm -C web test                             # the frontend's unit tests: 41 passed
+pnpm -C web local                            # the app on a local chain, at / and /app
+```
+
+### Run locally
+
+Tools to install: fe 26.6.0 (on Windows, the release asset; elsewhere `feup`), Foundry (for `anvil` and `cast`), Node 22 with pnpm 10, and Python 3.12. Then `pnpm -C web install` and `pnpm -C web local`. Ctrl+C stops Vite and Anvil together. [Deploy](#deploy) lists everything the command does, and [Contract addresses](#contract-addresses) the addresses it deploys to.
 
 ## Built at Fe Builders Challenge 2026
 
@@ -100,22 +172,32 @@ No public network is used. These are the deterministic addresses of Anvil dev ac
 
 ## How it works
 
-**Batches.** Batch k covers `[genesis + k*L, genesis + (k+1)*L)`, with `L` = `batchSeconds` (120 in `deploy/params.json`). Orders go into the current batch. A batch holds at most `maxOrders` (100). Once a batch has ended, anyone calls `clear(batch)` once; then anyone calls `claim(batch, index)` per order, which credits the order's owner. Owners `withdraw` free balances.
+### The mechanism, step by step
 
-**Units.** Quantities are base units of the 18-decimal TestToken; prices are wei per whole token; quote amounts are wei. A trade of `q` at `p` costs `q*p/10^18`. Buyers pay `cost_ceil` (rounded up); sellers receive `proceeds_floor` (rounded down). A buy locks `cost_ceil(q, limit)` at placement; a sell locks `q`. Quantities are capped at `MAX_QUANTITY = 10^30` base units.
+1. **Place.** A trader calls `placeBuy(limit, quantity)` or `placeSell(limit, quantity)` and the order joins the current batch. A buy locks `cost_ceil(q, limit)` of the trader's free ETH; a sell locks `q` tokens. A batch holds at most `maxOrders` (100).
+2. **Close.** Batch k covers `[genesis + k*L, genesis + (k+1)*L)`, with `L` = `batchSeconds` (120 in `deploy/params.json`). Once that window has passed, the batch takes no more orders.
+3. **Clear.** Anyone calls `clear(batch)`, once. The contract runs the clearing rule over the book, rations the long side and writes the cleared price and each order's fill. No funds move.
+4. **Claim.** Anyone calls `claim(batch, index)` for each order. It credits the order's owner with what the fill bought or sold and unlocks the rest. Owners take free balances out with `withdraw`.
 
-**The clearing rule** (`select_price`). Candidates are the distinct limit prices. D(p) is the total buy quantity with limit at or above p; S(p) is the total sell quantity with limit at or below p.
+### The clearing rule
+
+`select_price` takes the distinct limit prices as candidates. D(p) is the total buy quantity with limit at or above p; S(p) is the total sell quantity with limit at or below p.
+
 1. Maximise V(p) = min(D, S).
 2. Among those, minimise |D - S|.
 3. Among those, take the highest price with D >= S; if none, the lowest.
 
-With no price where V > 0 there is no trade and everything is refunded. It is O(N log N): sort, then one ascending sweep. The earlier rule "else lowest" was rejected because a tie mixing excess demand and excess supply made rationing infeasible; the vector `vector_mixed_sign_tie` pins that case.
+With no price where V > 0 there's no trade and everything is refunded. It's O(N log N): sort, then one ascending sweep. The earlier rule "else lowest" was rejected because a tie mixing excess demand and excess supply made rationing infeasible; the vector `vector_mixed_sign_tie` pins that case.
 
-**Rationing** (`allocate`). Only the long side's orders at exactly the clearing price are rationed. Strictly better orders, and every order of the short side that can trade, fill in full. Marginal orders share `share = marginal - |D - S|` pro rata by quantity, rounded down; the leftover units go one each to the largest fractional remainder, then larger quantity, then lower owner (address word), then the owner's earlier own order (`owner_seq`).
+### Rationing the long side
+
+`allocate` rations only the long side's orders at exactly the clearing price. Strictly better orders, and every order of the short side that can trade, fill in full. Marginal orders share `share = marginal - |D - S|` pro rata by quantity, rounded down. The leftover units go one each to the largest fractional remainder, then larger quantity, then lower owner (address word), then the owner's earlier own order (`owner_seq`).
 
 **Identity wording, kept exactly.** Clearing has no `Ctx` or caller effect; the only identity it reads is each order's recorded owner, used only for the final tie-breaks (owner address, then the owner's own order sequence), which decide at most 1 base unit per order.
 
-**Rounding and settlement.** Rounding favours the contract, and solvency is a test (below), not an assumption. `clear` writes the cleared price and each order's fill; `claim` credits internal balances; only `withdraw` pays out, and it is the only function that calls out of the contract.
+**Units.** Quantities are base units of the 18-decimal TestToken; prices are wei per whole token; quote amounts are wei. A trade of `q` at `p` costs `q*p/10^18`. Buyers pay `cost_ceil` (rounded up); sellers receive `proceeds_floor` (rounded down). Quantities are capped at `MAX_QUANTITY = 10^30` base units.
+
+**Rounding and settlement.** Rounding favours the contract, and solvency is a test (below), not an assumption. `clear` writes the cleared price and each order's fill; `claim` credits internal balances; only `withdraw` pays out, and it's the only function that calls out of the contract.
 
 **The clock is an effect.** `Clock { now: Timestamp }` is an effect. The production `AnyOrder` builds it from `ctx.timestamp()`. `AnyOrderTestClock` is a twin that builds it from a stored test time moved forward only by its `setNow`; it exists only for `fe test` and is never deployed (the deploy script uses the allowlist `AnyOrder, TestToken, ConstantProductPool`). Both call the same free functions.
 
@@ -123,20 +205,24 @@ With no price where V > 0 there is no trade and everything is refunded. It is O(
 
 ## Security notes
 
-Unaudited. This is a hackathon prototype for a local chain; do not deposit value you cannot lose. The fourteen assumptions and limitations:
+Unaudited. This is a hackathon prototype for a local chain; don't deposit value you can't lose.
+
+### Trust boundaries
+
+The fourteen assumptions and limitations of the core design spec, one line each:
 
 1. The batch removes ordering, not market power or strategic placement.
 2. Block builders can censor orders.
 3. Timestamps can skew within a batch boundary, moving an order to the next batch.
 4. Denial of service is bounded by `maxOrders` (measured, see Gas below) and `minQuantity`.
 5. Rounding favours the contract; solvency is a test (`solvency_holds_after_every_step_of_a_seeded_run`).
-6. State is final before external calls, plus a transient `TSlot` lock on `withdraw`, the only function that pays out. The lock is test-covered: a payee re-entering `withdraw` for funds it really holds is refused, and the test fails when the `Reentrant` check is deleted (`scripts/mutant-reentrancy.sh`). The test exercises the ETH payout; the token payout relies on item 7.
-7. Standard ERC20 only.
+6. State is final before external calls, plus a transient `TSlot` lock on `withdraw`, the only function that pays out; the test covers the ETH payout and `scripts/mutant-reentrancy.sh` shows it fails without the lock.
+7. Standard ERC20 only; the token payout relies on it.
 8. Storage key domains are validated explicitly (orders are read only with `index < count`; `clear` accepts only `batch < currentBatch`).
-9. There is no oracle: a thin batch can clear far from outside prices.
+9. There's no oracle: a thin batch can clear far from outside prices.
 10. Prototype.
-11. Batch-filling griefing: anyone can fill a batch's `maxOrders` slots with minimum orders, costing them only locked capital. Per-address caps are Sybil-able, so this is stated, not solved.
-12. The owner-address tie-break: clearing reads each order's recorded owner for the final tie-breaks, deciding at most 1 base unit per order (wording under How it works).
+11. Batch-filling griefing: anyone can fill a batch's `maxOrders` slots with minimum orders, at the cost of locked capital only; per-address caps are Sybil-able, so it's stated, not solved.
+12. The owner-address tie-break: clearing reads each order's recorded owner for the final tie-breaks, deciding at most 1 base unit per order.
 13. `AnyOrderTestClock` exists only for `fe test` and is never deployed.
 14. Unaudited.
 
@@ -170,7 +256,39 @@ No gas-efficiency claim is made beyond these measured numbers.
 
 ## Build & test
 
-Tools to install: fe 26.6.0 (on Windows, the release asset; elsewhere `feup`), Foundry (for `anvil` and `cast`), Node 22 with pnpm 10, and Python 3.12.
+### Evidence
+
+One row per property, each with the file or command that proves it. Levels: `FE_TEST` is compiled and run by `fe test`; `REFERENCE_VECTOR` matches the exact-rational Python reference; `LOCAL_CHAIN` ran on a local Anvil chain through the app's tooling; `MEASURED` is a number read off a local run; **`NOT_YET_PROVEN`** hasn't been done.
+
+| Property | Level | Evidence |
+|---|---|---|
+| In the pool the sandwich pays the attacker; in the batch the victim's fill and the price don't move and the attacker nets 0 tokens and -1 wei | `FE_TEST` | [`ingots/exchange/src/sandwich_tests.fe`](ingots/exchange/src/sandwich_tests.fe), `fe test --filter sandwich` |
+| Arrival order can't change the price, the volume or any owner's totals (256 full shuffles) | `FE_TEST` | `permutation_full_shuffle_keeps_price_and_owner_totals` in [`ingots/clearing/src/props.fe`](ingots/clearing/src/props.fe) |
+| The same on the contract: 2 x 128 seeded interleavings across owners | `FE_TEST` | `permutation_contract_interleavings_seed_7` / `_seed_8` in [`ingots/exchange/src/invariant_tests.fe`](ingots/exchange/src/invariant_tests.fe) |
+| Fills respect limits; tokens and wei are conserved; volume is maximal over every integer price | `FE_TEST` | the `property_*` tests in [`ingots/clearing/src/props.fe`](ingots/clearing/src/props.fe) |
+| Holdings cover every balance and lock after each step of a seeded run | `FE_TEST` | `solvency_holds_after_every_step_of_a_seeded_run` in [`ingots/exchange/src/invariant_tests.fe`](ingots/exchange/src/invariant_tests.fe) |
+| The transient lock, and only the lock, refuses a re-entered `withdraw` on the ETH payout | `FE_TEST` | `reentrancy_lock_refuses_a_second_withdraw`, plus [`scripts/mutant-reentrancy.sh`](scripts/mutant-reentrancy.sh) (the test fails with the lock deleted) |
+| The clearing rule matches an exact-rational oracle on 20,000 random books; the lemmas and condition C hold | `REFERENCE_VECTOR` | [`ref/clearing_ref.py`](ref/clearing_ref.py) `--selftest` |
+| The textbook, edge and sandwich books the tests assert are the reference's own output | `REFERENCE_VECTOR` | [`ingots/clearing/src/vectors.fe`](ingots/clearing/src/vectors.fe), regenerated and checked by `python ref/clearing_ref.py --check` |
+| The production lifecycle with real block time, and a full batch of `maxOrders` under the cap | `LOCAL_CHAIN` | [`web/test/e2e/lifecycle.e2e.test.ts`](web/test/e2e/lifecycle.e2e.test.ts), `pnpm -C web test:e2e` |
+| The recorded run on the landing page reproduces the `fe test` constants on a real chain | `LOCAL_CHAIN` | [`web/test/e2e/scenario.e2e.test.ts`](web/test/e2e/scenario.e2e.test.ts), [`web/public/recorded/sandwich.json`](web/public/recorded/sandwich.json) |
+| A 100-order `clear()` costs 3,156,298 gas, gas table (real contract, demo order mix), about 19% of the 16,777,216 cap | `MEASURED` | [`docs/gas.md`](docs/gas.md), [`web/scripts/gas-table.ts`](web/scripts/gas-table.ts) |
+| Deployed on a public testnet or mainnet | **`NOT_YET_PROVEN`** | Nothing's deployed outside a local Anvil chain |
+| Audited | **`NOT_YET_PROVEN`** | No audit has been done |
+| Safe on a production compiler | **`NOT_YET_PROVEN`** | Built and tested on Fe 26.6.0 only |
+
+### How this could be misleading
+
+Said here before anyone has to ask:
+
+- The headline, -1 wei and every other fill unchanged, needs condition C: the attacker's two legs are equal in size and priced outside every other limit in the batch. Outside it, two things still hold: arrival order can't change the price or anyone's fills, and a trader whose equal buy and sell both fill nets 0 tokens and at most 0 wei.
+- A one-sided order still moves the price. One buy of 10 TKN at 0.026 takes it from 0.011 to 0.012; the attacker then pays that price too and holds the tokens.
+- Market power isn't removed. A big trader still moves a batch; the batch only takes away the value of going first.
+- The order book in the app is scripted: `pnpm -C web local` seeds it from Anvil dev accounts. No real trader has used it.
+- Every gas figure comes from a local Anvil chain with the Osaka rules, not from a public network.
+- Clearing isn't blind to owners. It has no Ctx or caller effect; the only identity it reads is each order's recorded owner, used only for the final tie-breaks, which decide at most 1 base unit per order.
+
+### Every command and what it proves
 
 ```sh
 fe --version                                 # fe 26.6.0 (5b3f96a)
@@ -187,8 +305,6 @@ pnpm -C web install
 pnpm -C web test                             # unit tests
 pnpm -C web test:e2e                         # needs Anvil and a built out/: chain tooling, lifecycle, full batch, scenario
 ```
-
-What each proves:
 
 | Command or test | What it proves |
 |---|---|
@@ -210,7 +326,7 @@ What each proves:
 | `bash scripts/gas-spike.sh` | the gas spike (prototype, every order filled) at N = 10, 50, 100 (under Security notes, Gas) |
 | `pnpm -C web test`, `pnpm -C web test:e2e` | the frontend's unit tests; the end-to-end suite against a real Anvil: ABI module matches `abi/`, ABI check from a path with spaces, the production lifecycle with real block time, a full batch of `maxOrders` under the cap, and the scenario reproducing the `fe test` constants |
 
-Property tests are seeded (`KeccakRng::seeded(n)`) and hand-rolled, so a failure replays exactly. At the time of writing, `fe test` reports `test result: ok. 57 passed; 0 failed`.
+Property tests are seeded (`KeccakRng::seeded(n)`) and hand-rolled, so a failure replays exactly. At the time of writing, `fe test` reports `test result: ok. 57 passed; 0 failed` and `pnpm -C web test` reports `Tests  41 passed (41)`.
 
 ## Deploy
 
@@ -231,13 +347,23 @@ It starts Anvil (`--hardfork osaka --enable-tx-gas-limit --chain-id 31337` on po
 
 On a continuous exchange, the order of transactions inside a block decides who gets what price. A sandwich attacker places one order just before a victim's and one just after, moves the price against the victim and keeps the difference. In the recorded pool scenario the victim gets 13.773314203730272596 TKN instead of 14.457831325301204819 TKN, and the attacker nets 0.008090638930163447 ETH. The people hurt are ordinary traders on a constant-product pool or order book; the people who profit control transaction ordering.
 
+### Why this exists
+
+A pool can't help it: its price is a curve, and every trade walks along the curve in the order the trades land. A batch has no curve to walk. Here's the same victim, the same attacker and the same 0.165 ETH, from the recorded run:
+
+| | Continuous pool | Batch |
+|---|---|---|
+| Victim alone | 14.457831325301204819 TKN for 0.165 ETH | 15 TKN for exactly 0.165 ETH, price 0.011 |
+| Victim, sandwiched | 13.773314203730272596 TKN for 0.165 ETH | 15 TKN for exactly 0.165 ETH, price 0.011 |
+| Attacker | **profit 0.008090638930163447 ETH** | 0 tokens and -1 wei |
+
 ## Approach
 
 Make ordering irrelevant by construction. Orders are collected for a fixed-length batch, then all are cleared at one uniform price chosen by a pure function of the book (the rule under How it works). Since everyone in the batch trades at the same price, being first or last is worth nothing. I built, during the contest: the clearing ingot with its rationing and rounding, the batch exchange contract, a test ERC20, a constant-product pool as the baseline victim, proxy actors, hand-rolled seeded property tests (price and per-owner fills are unchanged by 256 full shuffles and by 2 x 128 contract-level interleavings), a stdlib-only exact-rational Python reference that regenerates the test vectors, and a dApp (landing page at `/`, app at `/app`) that reads the real contract on a local Anvil chain.
 
 ## Fe highlight
 
-Effects make the claim checkable from signatures. The price rule has no effects at all, and the handler that accepts orders cannot call out of the contract:
+Effects make the claim checkable from signatures. The price rule has no effects at all, and the handler that accepts orders can't call out of the contract:
 
 ```fe
 pub fn select_price(_ orders: MemVec<Order>) -> Clearing
@@ -246,7 +372,7 @@ pub fn place(owner: Address, is_buy: bool, limit: u256, quantity: u256) -> Order
 uses (clock: Clock, settings: Settings, book: mut Book, funds: mut Funds, log: mut Log)
 ```
 
-`select_price` has no `uses` clause: it cannot read the clock, a caller, storage, or move funds. `place` names exactly the effects it touches and none of them is `Call`, so it cannot make an external call; likewise `clear_batch` and `claim`. In `ingots/exchange/src/logic.fe`:
+`select_price` has no `uses` clause: it can't read the clock, a caller, storage, or move funds. `place` names exactly the effects it touches and none of them is `Call`, so it can't make an external call; likewise `clear_batch` and `claim`. In `ingots/exchange/src/logic.fe`:
 
 | Function | `uses` | Can move funds? |
 |---|---|---|
@@ -262,6 +388,22 @@ The same property makes the clock testable: `Clock` is an effect, so `AnyOrder` 
 
 ## Architecture
 
+```mermaid
+flowchart LR
+  ref["ref/clearing_ref.py<br/>exact-rational reference"] -->|"writes vectors.fe"| clearing["anyorder_clearing<br/>ingots/clearing: pure, no effects"]
+  clearing -->|"select_price, allocate"| exchange["anyorder<br/>ingots/exchange: the AnyOrder contract"]
+  exchange -->|"fe build, ABI frozen in abi/"| web["web/<br/>landing page at /, app at /app"]
+  web -->|"deploy, seed, read, eth_sendTransaction"| anvil["local Anvil<br/>chain id 31337"]
+```
+
+The reference checks the rule; the clearing ingot is the rule, with no effects; the exchange contract is the only thing that holds funds; the dApp only reads and sends what the contract defines.
+
+The frozen interface of `AnyOrder`: constructor `AnyOrder(token, genesis, batchLength, maxOrders, minQuantity, maxPrice)`; `depositEth()` payable, `depositToken(uint256)`, `withdraw(base, quote)`, `placeBuy(limit, quantity)` and `placeSell(limit, quantity)` returning `(batch, index)`, `clear(batch)` returning `(traded, price, volume)`, `claim(batch, index)` returning `(base, quote)`, and the views `config`, `currentBatch`, `batchInfo`, `orderAt`, `preview` and `balances`. Events: `Deposited`, `Withdrawn`, `OrderPlaced`, `BatchCleared`, `Claimed`. The ABI JSON of the three deployed contracts is frozen in `abi/` and checked by `scripts/check-abi.sh`.
+
+The dApp (`web/`) is TypeScript, React 19 islands, Vite 7 and viem 2.58. `public/deployment.json`, written by the deploy script, tells the pages where the contracts are; a viem client polls the chain every 2 seconds and the islands render what the contract returns, and show a dash (`UNKNOWN` in `web/src/lib/format.ts`) for anything not yet read.
+
+### Repository map
+
 ```
 fe.toml                         [workspace] anyorder: ingots/clearing, ingots/exchange
 ingots/clearing/                ingot anyorder_clearing: pure library, no contract, no effects
@@ -275,17 +417,16 @@ ingots/exchange/                ingot anyorder
   src/testclock.fe              AnyOrderTestClock (TEST ONLY: Clock from a stored test time)
   src/token.fe pool.fe          TestToken (ERC20) and ConstantProductPool (BASELINE ONLY)
   src/actors.fe harness.fe      Trader, Reenterer (TEST ONLY) and the tests' helpers
-  src/*_tests.fe                token, lifecycle, invariant (permutation, solvency, reentrancy), sandwich
+  src/*_tests.fe                token, pool, lifecycle, invariant (permutation, solvency, reentrancy), sandwich
 ref/clearing_ref.py             stdlib-only exact reference; writes vectors.fe through `fe fmt`
-spikes/gas/  scripts/gas-spike.sh   throwaway gas prototype (not a workspace member)
 deploy/params.json              maxOrders, demoBatchSize, batchSeconds, minQuantity, maxPrice
-abi/*.abi.json  scripts/check-abi.sh  frozen ABIs of the three deployed contracts
-web/                            the dApp: chain tooling, landing page at /, app at /app
+abi/*.abi.json                  frozen ABIs of the three deployed contracts
+scripts/                        check-abi.sh, gas-spike.sh, mutant-reentrancy.sh and the docs checks
+spikes/gas/                     throwaway gas prototype (not a workspace member)
+web/                            the dApp: chain tooling (scripts/), landing page at /, app at /app, tests
+demo/                           the demo video's capture and render scripts
+docs/                           specs and plans (superpowers/), gas notes, demo script, tollgate, gates
 ```
-
-The frozen interface of `AnyOrder`: constructor `AnyOrder(token, genesis, batchLength, maxOrders, minQuantity, maxPrice)`; `depositEth()` payable, `depositToken(uint256)`, `withdraw(base, quote)`, `placeBuy(limit, quantity)` and `placeSell(limit, quantity)` returning `(batch, index)`, `clear(batch)` returning `(traded, price, volume)`, `claim(batch, index)` returning `(base, quote)`, and the views `config`, `currentBatch`, `batchInfo`, `orderAt`, `preview` and `balances`. Events: `Deposited`, `Withdrawn`, `OrderPlaced`, `BatchCleared`, `Claimed`. The ABI JSON of the three deployed contracts is frozen in `abi/` and checked by `scripts/check-abi.sh`.
-
-The dApp (`web/`) is TypeScript, React 19 islands, Vite 7 and viem 2.58. `public/deployment.json`, written by the deploy script, tells the pages where the contracts are; a viem client polls the chain every 2 seconds and the islands render what the contract returns, with `—` for anything not yet read.
 
 ## Limitations
 
@@ -295,13 +436,43 @@ The dApp (`web/`) is TypeScript, React 19 islands, Vite 7 and viem 2.58. `public
 
 **Where it does not hold.** One-sided or uneven orders can move the price (market power, not ordering): the attacker then pays the moved price too and holds inventory (the one-sided row in the table: price 0.011 becomes 0.012). A leg at exactly the clearing price joins the marginal pool and can shrink the victim's share. Orders are public before close, so cross-batch trading is ordinary price risk. Builders can censor; timestamp skew can move an order to the next batch.
 
-**Unfinished or out of scope.** No public network, no hosting, no audit. The native backend is not used (it is not available on Windows). The app's documented way to trade is the built-in Anvil dev-account traders; any optional injected-wallet mode is a convenience for the local chain and is not covered by the evidence suite. Batch-filling griefing and Sybil orders are stated, not solved. Security notes lists the full set of assumptions.
+**Unfinished or out of scope.** No public network, no audit. The landing page is hosted; the app needs a local chain. The native backend isn't used (it's not available on Windows). The app's documented way to trade is the built-in Anvil dev-account traders; any optional injected-wallet mode is a convenience for the local chain and is not covered by the evidence suite. Batch-filling griefing and Sybil orders are stated, not solved. Security notes lists the full set of assumptions.
+
+### What is real and what is not
+
+| | Status |
+|---|---|
+| Clearing rule, rationing, rounding | **Real.** Fe code, run by `fe test` and matched against the exact-rational reference |
+| The sandwich comparison | **Real, on a local chain.** The recorded run, and the same scenario live in the app inside Anvil snapshots |
+| The order book in the app | **Scripted.** Seeded by `pnpm -C web local`; no real trader has used it |
+| The traders | **Anvil dev accounts.** Test funds, no real value; no key is ever requested |
+| The landing page at `/` | **Real and hosted**, static, built from the recorded run |
+| The hosted `/app/` | **Reads no chain.** Each live panel shows how to run it locally |
+| Gas figures | **Measured on a local Anvil chain**, Osaka rules, per-transaction cap on |
+| Testnet or mainnet deployment | **None** |
+| Audit | **None** |
+| Native backend | **Not used** |
 
 ## Declaration
 
 - **Pre-existing work:** none beyond the starter (`fe-lang/builders-challenge-starter` @ `f9d9aa9`, Apache-2.0: LICENSE, CI layout, SUBMISSION.md template; the vault example was not kept). Everything else was written during the contest.
 - **Third-party code:** the TestToken adapted from the Fe guide's ERC20 and the v26.6.0 `erc20.fe` fixture; the proxy-actor pattern from the v26.6.0 `ownable.fe` and `escrow.fe` fixtures; the pool pricing after the guide's DEX `quote` (all Apache-2.0, argotorg/fe and fe-lang/www); the design kit's runtime files in `web/public/assets/` (Leonxlnx/taste-skill, MIT, notice included in `web/public/assets/THIRD-PARTY-NOTICE.md`).
 - **AI assistance:** built with Claude Code (the build-system pipeline: architect, orchestrator, executors); every task gated by tests the human contact can re-run.
+
+### Attribution and further reading
+
+Built for the [Fe Builders Challenge 2026](https://fe-lang.org/contest/), on [Fe](https://github.com/argotorg/fe) 26.6.0 and [Foundry](https://github.com/foundry-rs/foundry)'s Anvil.
+
+| Document | What is in it |
+|---|---|
+| [`docs/superpowers/specs/2026-11-18-anyorder-core-design.md`](docs/superpowers/specs/2026-11-18-anyorder-core-design.md) | The clearing rule, the sandwich claim stated precisely, the frozen interface, gas and the fourteen assumptions |
+| [`docs/superpowers/specs/2026-11-18-anyorder-dapp-design.md`](docs/superpowers/specs/2026-11-18-anyorder-dapp-design.md) | The dApp: pages, chain states, labels, the local run, hosted mode |
+| [`docs/superpowers/specs/2026-11-18-anyorder-docs-stretch-design.md`](docs/superpowers/specs/2026-11-18-anyorder-docs-stretch-design.md) | What the README and SUBMISSION may say, and the stretch work |
+| [`docs/superpowers/plans/`](docs/superpowers/plans/) | Every build task with its exact code and its gate |
+| [`docs/tollgate/2026-11-17-tollgate.md`](docs/tollgate/2026-11-17-tollgate.md) | The environment checks, the stack, and every defect found and how it was replanned |
+| [`docs/demo/2026-11-19-demo-script.md`](docs/demo/2026-11-19-demo-script.md) | The demo video's script and what each shot shows |
+| [`docs/gates/`](docs/gates/) | The submission draft and the closing-pass gate ledger |
+| [`docs/gas.md`](docs/gas.md) | The gas table and how it was measured |
 
 ## Team
 
@@ -317,3 +488,5 @@ Built by Dotman-Bei (GitHub), with Claude Code as described in the Declaration.
 ## License
 
 Apache-2.0, from the starter (see `LICENSE`). The design kit's runtime files under `web/public/assets/` are MIT; see `web/public/assets/THIRD-PARTY-NOTICE.md`.
+
+> AnyOrder doesn't make a market fair. It takes one lever away, the order of transactions, and every claim in this README stops where the tests stop.
