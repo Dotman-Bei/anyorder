@@ -1,7 +1,7 @@
 # Submission draft — Fe Builders Challenge 2026 (AnyOrder)
 
 The platform form, pre-answered by the Step 1 architect (2026-11-18) from the brief, the specs and the
-pack's `event.md`. The Step-3 closing pass resolves the `TBD-post-build:` lines and pastes the rest.
+pack's `event.md`. The Step-3 closing pass resolved the build-time facts below on 2026-11-24 and pastes the rest.
 The form's exact field list was not extracted (pack gap 3: forms are never opened by extraction); the
 fields below are every item the contest page and blog require, in their words.
 
@@ -27,13 +27,14 @@ A uniform-price batch-auction exchange in Fe whose fills are independent of tran
 
 - **Public GitHub repository with an OSI-approved license:** https://github.com/Dotman-Bei/anyorder,
   Apache-2.0 (the starter's LICENSE).
-  - TBD-post-build:repo-public-flip (the consent-gated Step-3 action; the repo is private until then)
+  - Public since 2026-11-24; GitHub detects the license as Apache-2.0.
 - **Commit SHA to judge:**
-  - TBD-post-build:commit-sha (the full 40-hex SHA of the final pushed commit on `main`)
+  - The full 40-hex SHA is entered in the submission form (the commit that contains this line cannot name itself).
 - **Project manifest:** `fe.toml` (workspace `anyorder`, members `ingots/clearing` = ingot
   `anyorder_clearing`, `ingots/exchange` = ingot `anyorder`).
 - **Exact Fe version:** `fe 26.6.0 (5b3f96a)` (release v26.6.0).
-  - TBD-post-build:fe-version-confirmation (re-run `fe --version` on the judged commit)
+  - Confirmed 2026-11-24 on a fresh clone of the public repository: `fe --version` prints
+    `fe 26.6.0 (5b3f96a)` and `fe test` reports `test result: ok. 57 passed; 0 failed`.
 
 ## README ("A README covering the approach, architecture, and limitations")
 
@@ -114,6 +115,6 @@ through a test-clock twin while the deployed contract reads the block timestamp.
 - Submit through the personal submission link before **2026-11-24 23:59 UTC** (internal target
   2026-11-24 18:00 UTC). "The latest valid submission counts. Include the exact commit SHA you want
   judged."
-  - TBD-post-build:submission-form-receipt (the form's receipt; not proof of acceptance)
-  - TBD-post-build:automated-check-confirmation-email ("an email confirms whether the automated checks
-    passed or explains what needs correcting"; check spam or ask on Zulip if none arrives)
+  - The form's receipt (not proof of acceptance) is recorded after submission.
+  - The confirmation email ("an email confirms whether the automated checks passed or explains what
+    needs correcting") is recorded after submission; check spam or ask on Zulip if none arrives.

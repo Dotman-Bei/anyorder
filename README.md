@@ -86,7 +86,7 @@ Starting point: "Rethink a protocol", with the "Make the math work" and "Build f
 
 Team: see [Team](#team). Built from 2026-11-17, starting from the contest starter (`fe-lang/builders-challenge-starter`).
 
-Repository: TBD-post-build:public-repo-url (the repository is private until the public flip).
+Repository: https://github.com/Dotman-Bei/anyorder
 
 ## Contract addresses
 
